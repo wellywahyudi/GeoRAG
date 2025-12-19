@@ -1,1 +1,27 @@
+# Rust build artifacts
 /target
+**/target/
+Cargo.lock
+
+# Rust debug files
+**/*.rs.bk
+*.pdb
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# GeoRAG workspace directories
+.georag/
+**/test-*/
+**/tmp-*/
+
+# Test output and temporary files
+*.log
+*.tmp
+/tmp/
+/test-output/
