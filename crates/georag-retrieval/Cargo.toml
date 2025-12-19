@@ -1,0 +1,20 @@
+[package]
+name = "georag-retrieval"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+georag-core = { path = "../georag-core" }
+georag-geo = { path = "../georag-geo" }
+georag-store = { path = "../georag-store" }
+georag-llm = { path = "../georag-llm" }
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

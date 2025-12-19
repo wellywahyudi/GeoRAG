@@ -1,0 +1,19 @@
+[package]
+name = "georag-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile = "3.8"
+serial_test = "3.0"

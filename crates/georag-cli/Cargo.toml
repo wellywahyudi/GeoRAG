@@ -1,0 +1,30 @@
+[package]
+name = "georag-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "georag"
+path = "src/main.rs"
+
+[dependencies]
+georag-core = { path = "../georag-core" }
+georag-geo = { path = "../georag-geo" }
+georag-retrieval = { path = "../georag-retrieval" }
+clap.workspace = true
+console.workspace = true
+tabled.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+toml.workspace = true
+geojson.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
