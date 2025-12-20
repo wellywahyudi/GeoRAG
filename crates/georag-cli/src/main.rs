@@ -8,6 +8,7 @@ mod config_loader;
 mod dry_run;
 mod output;
 mod output_types;
+mod storage;
 
 use anyhow::Result;
 use clap::Parser;
@@ -25,8 +26,13 @@ fn main() -> Result<()> {
     // Parse CLI arguments
     let cli = Cli::parse();
 
+    // Create async runtime
+    let runtime = tokio::runtime::Runtime::new()?;
+
     // Execute the command
-    commands::execute(cli)?;
+    runtime.block_on(async {
+        commands::execute(cli).await
+    })?;
 
     Ok(())
 }

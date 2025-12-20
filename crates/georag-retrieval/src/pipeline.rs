@@ -192,7 +192,7 @@ where
         // Perform similarity search
         let mut results = self
             .vector_store
-            .similarity_search(&query_embedding, plan.top_k)
+            .similarity_search(&query_embedding, plan.top_k, None)
             .await?;
 
         // Filter to only include candidates from spatial phase

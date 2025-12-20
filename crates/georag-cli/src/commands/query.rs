@@ -3,6 +3,7 @@
 use crate::cli::QueryArgs;
 use crate::output::OutputWriter;
 use crate::output_types::{QueryOutput, QueryResultItem};
+use crate::storage::Storage;
 use anyhow::{bail, Context, Result};
 use georag_core::models::workspace::IndexState;
 use georag_core::models::WorkspaceConfig;
@@ -11,7 +12,7 @@ use georag_retrieval::models::{QueryPlan, QueryResult, SourceReference};
 use std::fs;
 use std::path::PathBuf;
 
-pub fn execute(args: QueryArgs, output: &OutputWriter, explain: bool) -> Result<()> {
+pub async fn execute(args: QueryArgs, output: &OutputWriter, explain: bool, _storage: &Storage) -> Result<()> {
     // Find workspace root
     let workspace_root = find_workspace_root()?;
     let georag_dir = workspace_root.join(".georag");
@@ -35,14 +36,16 @@ pub fn execute(args: QueryArgs, output: &OutputWriter, explain: bool) -> Result<
     };
 
     // Create query plan
-    let mut query_plan = QueryPlan::new(&args.query)
+    let query_plan = QueryPlan::new(&args.query)
         .with_semantic_rerank(!args.no_rerank)
         .with_top_k(args.top_k)
         .with_explain(explain);
     
-    if let Some(filter) = spatial_filter.clone() {
-        query_plan = query_plan.with_spatial_filter(filter);
-    }
+    let query_plan = if let Some(filter) = spatial_filter.clone() {
+        query_plan.with_spatial_filter(filter)
+    } else {
+        query_plan
+    };
 
     // Display query plan
     output.section("Query Plan");
@@ -63,6 +66,10 @@ pub fn execute(args: QueryArgs, output: &OutputWriter, explain: bool) -> Result<
 
     // Simulate query execution (since we don't have actual retrieval implementation yet)
     output.section("Executing Query");
+    
+    // TODO: Use storage.spatial.spatial_query() for spatial filtering
+    // TODO: Use storage.vector.similarity_search() for semantic search
+    // TODO: Use storage.document.get_chunks() to retrieve chunk content
     
     // Simulate spatial matches
     let spatial_matches = 5; // Simulated

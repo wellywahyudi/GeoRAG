@@ -12,6 +12,7 @@ georag-geo = { path = "../georag-geo" }
 thiserror.workspace = true
 async-trait.workspace = true
 serde.workspace = true
+tokio.workspace = true
 
 # PostgreSQL dependencies
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "migrate", "chrono"] }

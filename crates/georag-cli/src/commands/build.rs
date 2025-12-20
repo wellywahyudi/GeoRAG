@@ -5,6 +5,7 @@ use crate::config_loader::{find_workspace_root, load_workspace_config_with_overr
 use crate::dry_run::{display_planned_actions, ActionType, PlannedAction};
 use crate::output::OutputWriter;
 use crate::output_types::BuildOutput;
+use crate::storage::Storage;
 use anyhow::{bail, Result};
 use chrono::Utc;
 use georag_core::config::CliConfigOverrides;
@@ -13,9 +14,8 @@ use georag_core::models::workspace::IndexState;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
 
-pub fn execute(args: BuildArgs, output: &OutputWriter, dry_run: bool) -> Result<()> {
+pub async fn execute(args: BuildArgs, output: &OutputWriter, dry_run: bool, storage: &Storage) -> Result<()> {
     // Find workspace root
     let workspace_root = find_workspace_root()?;
     let georag_dir = workspace_root.join(".georag");
@@ -27,8 +27,8 @@ pub fn execute(args: BuildArgs, output: &OutputWriter, dry_run: bool) -> Result<
     };
     let config = load_workspace_config_with_overrides(&workspace_root, overrides)?;
 
-    // Load datasets
-    let datasets = load_datasets(&georag_dir)?;
+    // Load datasets from storage
+    let datasets = storage.spatial.list_datasets().await?;
 
     if datasets.is_empty() {
         bail!("No datasets to build. Add datasets with 'georag add' first.");
@@ -108,6 +108,7 @@ pub fn execute(args: BuildArgs, output: &OutputWriter, dry_run: bool) -> Result<
     // Step 2: Fix invalid geometries
     output.section("Step 2: Validating geometries");
     // For now, we'll just report that validation passed
+    let fixed_count = 0;
     output.info("  Fixed 0 invalid geometries");
 
     // Step 3: Generate embeddings
@@ -165,18 +166,6 @@ pub fn execute(args: BuildArgs, output: &OutputWriter, dry_run: bool) -> Result<
     }
 
     Ok(())
-}
-
-/// Load datasets from datasets.json
-fn load_datasets(georag_dir: &PathBuf) -> Result<Vec<DatasetMeta>> {
-    let datasets_file = georag_dir.join("datasets.json");
-    if !datasets_file.exists() {
-        return Ok(Vec::new());
-    }
-    
-    let content = fs::read_to_string(&datasets_file)?;
-    let datasets: Vec<DatasetMeta> = serde_json::from_str(&content)?;
-    Ok(datasets)
 }
 
 /// Generate a deterministic hash for the index

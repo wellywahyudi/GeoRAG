@@ -71,6 +71,13 @@ impl PostgresConfig {
         })
     }
 
+    /// Create a new configuration from a database URL string
+    /// 
+    /// This is an alias for `new()` with a more descriptive name
+    pub fn from_database_url(database_url: &str) -> Result<Self, ConfigError> {
+        Self::new(database_url.to_string())
+    }
+
     /// Validate the configuration
     pub fn validate(&self) -> Result<(), ConfigError> {
         if self.database_url.trim().is_empty() {

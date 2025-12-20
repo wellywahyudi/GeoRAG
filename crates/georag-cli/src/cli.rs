@@ -21,8 +21,21 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub explain: bool,
 
+    /// Storage backend to use (memory or postgres)
+    #[arg(long, global = true, default_value = "memory")]
+    pub storage: StorageBackend,
+
     #[command(subcommand)]
     pub command: Commands,
+}
+
+/// Storage backend selection
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum StorageBackend {
+    /// In-memory storage (default, for development)
+    Memory,
+    /// PostgreSQL persistent storage
+    Postgres,
 }
 
 #[derive(Subcommand, Debug)]
@@ -44,6 +57,12 @@ pub enum Commands {
 
     /// Show workspace status
     Status(StatusArgs),
+
+    /// Migrate data from in-memory storage to PostgreSQL
+    Migrate(MigrateArgs),
+
+    /// Manage database indexes
+    Index(IndexArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -147,4 +166,75 @@ pub struct StatusArgs {
     /// Show detailed status
     #[arg(long)]
     pub verbose: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct MigrateArgs {
+    /// PostgreSQL database URL (e.g., postgresql://user:pass@localhost/georag)
+    #[arg(long)]
+    pub database_url: String,
+
+    /// Show what would be migrated without making changes
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Batch size for transferring records
+    #[arg(long, default_value = "1000")]
+    pub batch_size: usize,
+
+    /// Verify data integrity after migration
+    #[arg(long)]
+    pub verify: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct IndexArgs {
+    /// Index management command
+    #[command(subcommand)]
+    pub command: IndexCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum IndexCommand {
+    /// Rebuild database indexes
+    Rebuild(RebuildArgs),
+
+    /// Show index statistics
+    Stats(StatsArgs),
+
+    /// Run VACUUM and ANALYZE for maintenance
+    Vacuum(VacuumArgs),
+}
+
+#[derive(Parser, Debug)]
+pub struct RebuildArgs {
+    /// Specific index to rebuild (rebuilds all if not specified)
+    #[arg(long)]
+    pub index: Option<String>,
+
+    /// Rebuild indexes concurrently (non-blocking)
+    #[arg(long, default_value = "true")]
+    pub concurrently: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct StatsArgs {
+    /// Specific index to show stats for (shows all if not specified)
+    #[arg(long)]
+    pub index: Option<String>,
+}
+
+#[derive(Parser, Debug)]
+pub struct VacuumArgs {
+    /// Specific table to vacuum (vacuums all if not specified)
+    #[arg(long)]
+    pub table: Option<String>,
+
+    /// Run ANALYZE after VACUUM
+    #[arg(long, default_value = "true")]
+    pub analyze: bool,
+
+    /// Run FULL vacuum (locks table, reclaims more space)
+    #[arg(long)]
+    pub full: bool,
 }

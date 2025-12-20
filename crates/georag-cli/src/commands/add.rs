@@ -4,14 +4,15 @@ use crate::cli::AddArgs;
 use crate::dry_run::{display_planned_actions, ActionType, PlannedAction};
 use crate::output::OutputWriter;
 use crate::output_types::{AddOutput, CrsMismatchInfo};
+use crate::storage::Storage;
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
-use georag_core::models::{DatasetId, DatasetMeta, WorkspaceConfig};
+use georag_core::models::{Dataset, DatasetId};
 use georag_core::models::dataset::GeometryType;
 use std::fs;
 use std::path::PathBuf;
 
-pub fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool) -> Result<()> {
+pub async fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool, storage: &Storage) -> Result<()> {
     // Check if dataset file exists
     if !args.path.exists() {
         bail!("Dataset file not found: {}", args.path.display());
@@ -22,7 +23,11 @@ pub fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool) -> Result<()
     let georag_dir = workspace_root.join(".georag");
 
     // Load workspace config
-    let config = load_workspace_config(&georag_dir)?;
+    let config_path = georag_dir.join("config.toml");
+    let config_content = fs::read_to_string(&config_path)
+        .context("Failed to read config.toml")?;
+    let config: georag_core::models::WorkspaceConfig = toml::from_str(&config_content)
+        .context("Failed to parse config.toml")?;
 
     // Read and validate the dataset
     let (geometry_type, feature_count, crs) = read_dataset_metadata(&args.path)?;
@@ -49,7 +54,7 @@ pub fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool) -> Result<()
         let mut actions = vec![
             PlannedAction::new(
                 ActionType::ModifyFile,
-                "Update datasets.json"
+                "Store dataset in database"
             )
             .with_detail(format!("Add dataset: {}", dataset_name))
             .with_detail(format!("Geometry Type: {:?}", geometry_type))
@@ -76,37 +81,23 @@ pub fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool) -> Result<()
         return Ok(());
     }
 
-    // Load existing datasets
-    let datasets_file = georag_dir.join("datasets.json");
-    let mut datasets: Vec<DatasetMeta> = if datasets_file.exists() {
-        let content = fs::read_to_string(&datasets_file)?;
-        serde_json::from_str(&content)?
-    } else {
-        Vec::new()
-    };
-
-    // Generate dataset ID
-    let dataset_id = DatasetId(datasets.len() as u64 + 1);
-
-    // Create dataset metadata
-    let dataset_meta = DatasetMeta {
-        id: dataset_id,
+    // Create dataset object
+    let dataset = Dataset {
+        id: DatasetId(0), // Will be assigned by storage
         name: dataset_name.clone(),
+        path: args.path.clone(),
         geometry_type,
         feature_count,
         crs,
         added_at: Utc::now(),
     };
 
-    // Add to datasets list
-    datasets.push(dataset_meta);
+    // Store dataset using SpatialStore trait
+    let dataset_id = storage.spatial.store_dataset(&dataset).await?;
 
-    // Save datasets.json
-    let datasets_json = serde_json::to_string_pretty(&datasets)?;
-    fs::write(&datasets_file, datasets_json)?;
-
-    // Copy dataset file to workspace
+    // Copy dataset file to workspace (for backward compatibility with file-based operations)
     let datasets_dir = georag_dir.join("datasets");
+    fs::create_dir_all(&datasets_dir)?;
     let dataset_filename = format!("{}_{}", dataset_id.0, args.path.file_name().unwrap().to_str().unwrap());
     let dest_path = datasets_dir.join(&dataset_filename);
     fs::copy(&args.path, &dest_path)?;
@@ -160,16 +151,6 @@ fn find_workspace_root() -> Result<PathBuf> {
             bail!("Not in a GeoRAG workspace. Run 'georag init' first.");
         }
     }
-}
-
-/// Load workspace configuration
-fn load_workspace_config(georag_dir: &PathBuf) -> Result<WorkspaceConfig> {
-    let config_path = georag_dir.join("config.toml");
-    let config_content = fs::read_to_string(&config_path)
-        .context("Failed to read config.toml")?;
-    let config: WorkspaceConfig = toml::from_str(&config_content)
-        .context("Failed to parse config.toml")?;
-    Ok(config)
 }
 
 /// Read dataset metadata from a GeoJSON file

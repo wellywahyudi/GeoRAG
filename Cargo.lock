@@ -970,6 +970,7 @@ dependencies = [
  "georag-core",
  "georag-geo",
  "georag-retrieval",
+ "georag-store",
  "serde",
  "serde_json",
  "tabled",
