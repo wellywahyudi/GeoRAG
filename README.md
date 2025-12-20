@@ -1,5 +1,5 @@
 <p align="center">
-<img src="docs/assets/georag-logo.svg" alt="GeoRAG logo" width="60%">
+<img src="docs/assets/GeoRAG.png" alt="GeoRAG - Geospatial Data RAG" width="100%">
 <br>
 
 <div align="center">
@@ -12,8 +12,6 @@
 </div>
 
 <br>
-
-✨ **If you find GeoRAG useful, please consider starring the repo!**
 
 > [!WARNING]
 > GeoRAG is in active development! As we build towards 1.0, future updates **will** contain **breaking changes**. We'll annotate changes and provide migration paths as the project evolves. Join us on this journey to build the best geospatial RAG system in Rust!

@@ -162,7 +162,7 @@ impl VectorStore for MemoryVectorStore {
         Ok(())
     }
 
-    async fn similarity_search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredResult>> {
+    async fn similarity_search(&self, query: &[f32], k: usize, threshold: Option<f32>) -> Result<Vec<ScoredResult>> {
         let embeddings = self.embeddings.read().unwrap();
 
         let mut results: Vec<ScoredResult> = embeddings
@@ -176,6 +176,11 @@ impl VectorStore for MemoryVectorStore {
                 }
             })
             .collect();
+
+        // Apply threshold filtering if specified
+        if let Some(threshold) = threshold {
+            results.retain(|r| r.score >= threshold);
+        }
 
         // Sort by score descending
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));

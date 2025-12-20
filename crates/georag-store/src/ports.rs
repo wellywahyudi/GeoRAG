@@ -40,7 +40,8 @@ pub trait VectorStore: Send + Sync {
 
     /// Perform similarity search
     /// Returns the top k most similar embeddings to the query vector
-    async fn similarity_search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredResult>>;
+    /// If threshold is provided, only returns results with similarity >= threshold
+    async fn similarity_search(&self, query: &[f32], k: usize, threshold: Option<f32>) -> Result<Vec<ScoredResult>>;
 
     /// Get embedding by chunk ID
     async fn get_embedding(&self, chunk_id: ChunkId) -> Result<Option<Embedding>>;

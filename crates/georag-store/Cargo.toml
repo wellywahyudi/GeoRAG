@@ -13,6 +13,12 @@ thiserror.workspace = true
 async-trait.workspace = true
 serde.workspace = true
 
+# PostgreSQL dependencies
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "migrate", "chrono"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+serde_json.workspace = true
+
 [dev-dependencies]
 tokio.workspace = true
 proptest.workspace = true
+testcontainers = "0.15"
