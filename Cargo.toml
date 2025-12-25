@@ -31,6 +31,8 @@ toml = "0.8"
 geo = "0.28"
 geojson = "0.24"
 proj = "0.27"
+gdal = { version = "0.16", features = ["bindgen"] }
+gdal-sys = "0.9"
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }

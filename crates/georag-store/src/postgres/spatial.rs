@@ -131,6 +131,14 @@ impl SpatialStore for PostgresStore {
                     geometry_type,
                     feature_count: row.get::<i32, _>("feature_count") as usize,
                     crs,
+                    format: georag_core::models::dataset::FormatMetadata {
+                        format_name: "GeoJSON".to_string(), // Default for now
+                        format_version: None,
+                        layer_name: None,
+                        page_count: None,
+                        paragraph_count: None,
+                        extraction_method: None,
+                    },
                     added_at: row.get("created_at"),
                 };
 

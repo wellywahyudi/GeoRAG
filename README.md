@@ -14,26 +14,11 @@
 <br>
 
 > [!WARNING]
-> GeoRAG is in active development! As we build towards 1.0, future updates **will** contain **breaking changes**. We'll annotate changes and provide migration paths as the project evolves. Join us on this journey to build the best geospatial RAG system in Rust!
-
-## Table of Contents
-
-- [What is GeoRAG?](#what-is-georag)
-- [Features](#features)
-- [Who's Using GeoRAG?](#whos-using-georag)
-- [Get Started](#get-started)
-  - [Installation](#installation)
-  - [Simple Example](#simple-example)
-- [Architecture](#architecture)
-- [Integrations](#integrations)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
+> GeoRAG is in active development! As we build towards 1.0, future updates **will** contain **breaking changes**. We'll annotate changes and provide migration paths as the project evolves.
 
 ## What is GeoRAG?
 
 GeoRAG is a Rust library for building **location-aware RAG applications** that combine spatial filtering, lexical search, and vector-based semantic retrieval. Built with privacy and correctness in mind, all processing happens locally without cloud dependencies.
-
-More information can be found in the [Quick Start Guide](docs/quick-start.md) and [API Documentation](https://docs.rs/georag-core/latest/georag/).
 
 ## Features
 
@@ -41,217 +26,84 @@ More information can be found in the [Quick Start Guide](docs/quick-start.md) an
 - **Local-First** - All processing happens on your machine, no cloud dependencies
 - **Deterministic** - Reproducible index builds with hash verification
 - **CRS-Transparent** - Explicit coordinate reference system handling and validation
-- **Flexible Output** - Human-readable terminal output or machine-readable JSON
+- **Interactive CLI** - Guided prompts, progress bars, and helpful error messages
+- **Flexible Storage** - In-memory or PostgreSQL/PostGIS backends
 - **Inspectable** - Every operation can be explained, replayed, and debugged
-- **Hexagonal Architecture** - Clean separation between core logic and adapters
-- **Property-Based Testing** - Correctness properties verified across all inputs
 
-## Get Started
+## Quick Start
 
 ### Installation
-
-```bash
-cargo add georag-core
-```
-
-Or install the CLI:
 
 ```bash
 # Clone and build
 git clone https://github.com/wellywahyudi/georag.git
 cd georag
+cargo build --release
+
+# Or install CLI
 cargo install --path crates/georag-cli
 ```
 
-**CLI Usage:**
+### Basic Usage
 
 ```bash
-# Initialize a workspace
-georag init my-workspace --crs 4326
+# Interactive setup
+georag init --interactive
 
-# Add a geospatial dataset
-cd my-workspace
-georag add data/cities.geojson
+# Add a dataset
+georag add cities.geojson
 
-# Build the retrieval index
+# Build the index
 georag build
 
 # Query with spatial constraints
 georag query "What are the main features?" \
   --spatial within \
-  --geometry bbox.geojson \
-  --distance 5km
+  --geometry bbox.geojson
 ```
 
-Note: Using `#[tokio::main]` requires enabling tokio's `macros` and `rt-multi-thread` features (`cargo add tokio --features macros,rt-multi-thread`).
-
-You can find more examples in each crate's `examples` directory (e.g., [`georag-core/examples`](./crates/georag-core/examples)). Detailed walkthroughs are available in our [documentation](docs/).
-
-## Architecture
-
-GeoRAG follows hexagonal architecture principles with clear separation of concerns:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Adapters Layer                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
-│  │   CLI    │  │   API    │  │   MCP    │               │
-│  └──────────┘  └──────────┘  └──────────┘               │
-└─────────────────────────────────────────────────────────┘
-                         │
-┌─────────────────────────────────────────────────────-───┐
-│                  Application Layer                      │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │           Use Cases & Orchestration              │   │
-│  └──────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────-┘
-                         │
-┌─────────────────────────────────────────────────────────┐
-│                    Domain Core                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
-│  │ georag-  │  │ georag-  │  │ georag-  │               │
-│  │  core    │  │   geo    │  │retrieval │               │
-│  └──────────┘  └──────────┘  └──────────┘               │
-└─────────────────────────────────────────────────────────┘
-                         │
-┌─────────────────────────────────────────────────────────┐
-│              Infrastructure Adapters                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
-│  │ georag-  │  │ georag-  │  │ georag-  │               │
-│  │  store   │  │   llm    │  │   api    │               │
-│  └──────────┘  └──────────┘  └──────────┘               │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Crates
-
-The GeoRAG workspace is organized into focused crates:
-
-- **[georag-core](crates/georag-core)** - Domain models, workspace management, configuration
-- **[georag-geo](crates/georag-geo)** - Geometry operations, CRS handling, spatial predicates
-- **[georag-retrieval](crates/georag-retrieval)** - Search pipelines, ranking, query execution
-- **[georag-llm](crates/georag-llm)** - Embedding generation with local models (Ollama)
-- **[georag-store](crates/georag-store)** - Storage abstractions (in-memory, file-based)
-- **[georag-cli](crates/georag-cli)** - Command-line interface
-- **[georag-api](crates/georag-api)** - HTTP API (coming soon)
-
-## Integrations
-
-### Vector Stores
-
-Vector stores are available as separate companion crates (coming soon):
-
-- **PostgreSQL/PostGIS**: `georag-postgres` (planned)
-- **SQLite**: `georag-sqlite` (planned)
-- **In-Memory**: Built into `georag-store`
-
-### Embedding Providers
-
-- **Ollama**: Built into `georag-llm` (local embeddings)
-- **OpenAI**: `georag-openai` (planned)
-- **Anthropic**: `georag-anthropic` (planned)
-
-### Storage Backends
-
-- **File System**: Built into `georag-store`
-- **S3**: `georag-s3` (planned)
-- **Cloud Storage**: Additional providers planned
+See the [Quick Start Guide](docs/quick-start.md) for detailed walkthrough.
 
 ## CLI Commands
 
-### Workspace Management
+### Core Commands
 
 ```bash
-# Initialize a new workspace
-georag init [PATH] --crs <EPSG> --distance-unit <UNIT>
-
-# Show workspace status
-georag status [--verbose]
+georag init [PATH]              # Initialize workspace
+georag add <FILE>               # Add dataset
+georag build                    # Build retrieval index
+georag query <TEXT>             # Query with spatial-semantic search
+georag status                   # Show workspace status
 ```
 
-### Dataset Operations
+### Database Operations (PostgreSQL)
 
 ```bash
-# Add a geospatial dataset
-georag add <FILE> [--name <NAME>] [--force]
-
-# List registered datasets
-georag inspect datasets
+georag migrate --database-url <URL>  # Migrate to PostgreSQL
+georag db rebuild                    # Rebuild database indexes
+georag db stats                      # Show database statistics
+georag db vacuum                     # Run maintenance
 ```
 
-### Index Building
+### Utilities
 
 ```bash
-# Build the retrieval index
-georag build [--embedder <MODEL>] [--force]
-
-# Inspect index metadata
-georag inspect index
+georag doctor                   # Run health checks
+georag status --datasets        # Show datasets only
+georag status --config          # Show configuration
 ```
 
-### Querying
+### Interactive Mode
+
+Add `--interactive` to any command for guided prompts:
 
 ```bash
-# Query with spatial filter
-georag query "your question" \
-  --spatial <PREDICATE> \
-  --geometry <FILE> \
-  --distance <DISTANCE> \
-  [--no-rerank] \
-  [--explain]
-
-# Spatial predicates: within, intersects, contains, bbox
+georag init --interactive
+georag add --interactive
+georag query --interactive
 ```
 
-### Inspection
-
-```bash
-# Inspect datasets
-georag inspect datasets
-
-# Inspect index
-georag inspect index
-
-# Inspect CRS information
-georag inspect crs
-
-# Inspect configuration
-georag inspect config
-```
-
-## Output Formatting
-
-GeoRAG supports flexible output formatting for different use cases:
-
-### JSON Output
-
-Perfect for scripting and automation:
-
-```bash
-# Get JSON output
-georag init --json
-georag status --json
-georag build --json
-
-# Parse with jq
-georag status --json | jq '.data.index.built'
-```
-
-### Dry-Run Mode
-
-Preview operations without making changes:
-
-```bash
-# See what would happen
-georag init --dry-run
-georag add dataset.geojson --dry-run
-georag build --dry-run
-
-# Combine with JSON
-georag build --dry-run --json
-```
-
-See the [Output Formatting Guide](docs/output-formatting.md) for detailed documentation.
+See [CLI Reference](docs/cli-reference.md) for complete documentation.
 
 ## Configuration
 
@@ -261,44 +113,33 @@ GeoRAG uses layered configuration with clear precedence:
 CLI Arguments > Environment Variables > Config File > Defaults
 ```
 
-### Configuration File
-
-Located at `.georag/config.toml`:
+### Configuration File (`.georag/config.toml`)
 
 ```toml
-# Coordinate Reference System (EPSG code)
-crs = 4326
+[storage]
+backend = "postgres"  # or "memory"
 
-# Distance unit for spatial operations
-distance_unit = "Meters"
+[postgres]
+host = "localhost"
+port = 5432
+database = "georag"
+user = "postgres"
 
-# Geometry validity mode
-geometry_validity = "Lenient"
+[embedder]
+default = "ollama:nomic-embed-text"
 ```
 
 ### Environment Variables
 
 ```bash
+export DATABASE_URL="postgresql://user:pass@localhost/georag"
 export GEORAG_CRS=4326
-export GEORAG_DISTANCE_UNIT=Kilometers
 export GEORAG_EMBEDDER=ollama:nomic-embed-text
-```
-
-### CLI Arguments
-
-```bash
-georag build --embedder ollama:mxbai-embed-large
-```
-
-Inspect configuration sources:
-
-```bash
-georag inspect config
 ```
 
 ## Examples
 
-### Example 1: Basic Workflow
+### Basic Workflow
 
 ```bash
 # Initialize workspace
@@ -318,44 +159,47 @@ georag query "What cities are in the region?" \
   --geometry region-boundary.geojson
 ```
 
-### Example 2: CI/CD Integration
+### Using PostgreSQL
 
 ```bash
-#!/bin/bash
-set -e
+# Set database URL
+export DATABASE_URL="postgresql://localhost/georag"
 
-# Initialize with JSON output
-georag init . --json > init.json
+# Initialize with PostgreSQL
+georag init --storage postgres
 
-# Add datasets
-for file in data/*.geojson; do
-  georag add "$file" --json >> datasets.json
-done
+# Add and build
+georag add data.geojson --storage postgres
+georag build --storage postgres
 
-# Build and verify
-georag build --json > build.json
+# Database maintenance
+georag db stats
+georag db rebuild
+```
+
+### JSON Output for Scripting
+
+```bash
+# Get JSON output
+georag status --json | jq '.data.index.built'
 
 # Check build status
-if jq -e '.status == "success"' build.json; then
-  echo "Build successful"
-else
-  echo "Build failed"
-  exit 1
+if georag status --json | jq -e '.data.index.built == true'; then
+  echo "Index is built"
 fi
 ```
 
-### Example 3: Safe Operations
+## Crates
 
-```bash
-# Preview changes
-georag build --dry-run
+The GeoRAG workspace is organized into focused crates:
 
-# Review output, then execute
-georag build
-
-# Verify with status
-georag status
-```
+- **[georag-core](crates/georag-core)** - Domain models, workspace management, configuration
+- **[georag-geo](crates/georag-geo)** - Geometry operations, CRS handling, spatial predicates
+- **[georag-retrieval](crates/georag-retrieval)** - Search pipelines, ranking, query execution
+- **[georag-llm](crates/georag-llm)** - Embedding generation with local models (Ollama)
+- **[georag-store](crates/georag-store)** - Storage abstractions (memory, PostgreSQL)
+- **[georag-cli](crates/georag-cli)** - Command-line interface
+- **[georag-api](crates/georag-api)** - HTTP API (coming soon)
 
 ## Development
 
@@ -363,66 +207,69 @@ georag status
 
 - Rust 1.70 or later
 - Cargo
+- GDAL library (libgdal-dev on Ubuntu/Debian, gdal on macOS via Homebrew)
+- PROJ library (libproj-dev on Ubuntu/Debian, proj on macOS via Homebrew)
 - Ollama (for embedding generation)
+- PostgreSQL with PostGIS (optional, for persistent storage)
+
+### Installing GDAL
+
+GDAL is required for reading Shapefile and GeoPackage formats.
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt-get update
+sudo apt-get install libgdal-dev libproj-dev
+```
+
+**macOS (Homebrew):**
+
+```bash
+brew install gdal proj
+```
+
+**Arch Linux:**
+
+```bash
+sudo pacman -S gdal proj
+```
+
+**Verify installation:**
+
+```bash
+gdal-config --version
+```
+
+If you encounter build issues, ensure `GDAL_HOME` points to your GDAL installation:
+
+```bash
+export GDAL_HOME=/usr/local  # or your GDAL installation path
+```
+
+**Troubleshooting:**
+
+If you see linking errors during build:
+
+- Ensure GDAL development headers are installed (not just the runtime)
+- On macOS, you may need to set: `export GDAL_HOME=$(brew --prefix gdal)`
+- On Linux, verify `pkg-config --modversion gdal` returns a version
 
 ### Building
 
 ```bash
 # Build all crates
-cargo build
-
-# Build with release optimizations
 cargo build --release
 
 # Build specific crate
 cargo build -p georag-cli
-```
 
-### Testing
-
-```bash
-# Run all tests
+# Run tests
 cargo test
 
-# Run tests for specific crate
-cargo test -p georag-core
-
-# Run integration tests
-cargo test --test '*'
-
-# Run with output
-cargo test -- --nocapture
-```
-
-### Code Quality
-
-```bash
-# Format code
+# Format and lint
 cargo fmt
-
-# Lint code
 cargo clippy
-
-# Check without building
-cargo check
-```
-
-## Project Structure
-
-```
-georag/
-├── crates/
-│   ├── georag-core/       # Core domain logic
-│   ├── georag-geo/        # Geometry operations
-│   ├── georag-retrieval/  # Search and ranking
-│   ├── georag-llm/        # Embedding generation
-│   ├── georag-store/      # Storage abstractions
-│   ├── georag-cli/        # Command-line interface
-│   └── georag-api/        # HTTP API (future)
-├── docs/                  # Documentation
-├── examples/              # Example code
-├── Cargo.toml            # Workspace manifest
-└── README.md             # This file
 ```
 
 ## Design Principles
@@ -448,24 +295,20 @@ georag/
 - Index builds are reproducible
 - Dry-run mode for all state changes
 
-### Extensible
-
-- Port/adapter pattern for integrations
-- Clean separation of concerns
-- Easy to add new storage backends
-- Easy to add new embedding models
-
 ## Roadmap
 
 - [x] Core workspace management
 - [x] Dataset registration and validation
 - [x] Index building with embeddings
 - [x] Spatial-semantic query execution
-- [x] JSON output and dry-run mode
-- [ ] Property-based testing suite
+- [x] Interactive CLI with progress indicators
+- [x] PostgreSQL/PostGIS storage backend
+- [x] Configuration file support
+- [x] Health check diagnostics
+- [ ] Embedding generation with local models
+- [ ] Spatial predicates and operations
 - [ ] HTTP API server
 - [ ] MCP protocol support
-- [ ] Additional storage backends (PostgreSQL/PostGIS)
 - [ ] Additional embedding models
 - [ ] Web UI
 
@@ -482,48 +325,23 @@ We welcome contributions! Here's how you can help:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests (`cargo test`)
-5. Run lints (`cargo clippy`)
-6. Format code (`cargo fmt`)
-7. Commit your changes (`git commit -m 'Add amazing feature'`)
-8. Push to the branch (`git push origin feature/amazing-feature`)
-9. Open a Pull Request
+3. Make your changes and add tests
+4. Run `cargo test`, `cargo clippy`, `cargo fmt`
+5. Commit your changes
+6. Push to the branch
+7. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines (coming soon).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## Documentation
 
-### Getting Started
-
 - [Quick Start Guide](docs/quick-start.md) - Get up and running in 5 minutes
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
-- [Output Formatting Guide](docs/output-formatting.md) - JSON output and dry-run mode
-
-### Advanced Topics
-
-- [Configuration Guide](docs/configuration.md) - Configuration management (coming soon)
-- [Architecture Guide](docs/architecture.md) - System architecture (coming soon)
-- [API Documentation](docs/api.md) - HTTP API reference (coming soon)
-- [Contributing Guide](CONTRIBUTING.md) - How to contribute (coming soon)
+- [Output Formatting](docs/output-formatting.md) - JSON output and dry-run mode
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with [Rust](https://www.rust-lang.org/)
-- Geometry operations powered by [geo](https://github.com/georust/geo)
-- Embeddings via [Ollama](https://ollama.ai/)
-- CLI framework: [clap](https://github.com/clap-rs/clap)
-
-## Community & Support
-
-- 📖 **[Documentation](docs/)** - Comprehensive guides and references
-- 🐛 **[Issue Tracker](https://github.com/wellywahyudi/georag/issues)** - Report bugs and request features
-- 💬 **[Discussions](https://github.com/wellywahyudi/georag/discussions)** - Ask questions and share ideas
-- 📧 **Email** - Contact the maintainers
 
 ## Acknowledgments
 
@@ -534,3 +352,12 @@ GeoRAG is built with excellent open-source tools:
 - [Ollama](https://ollama.ai/) - Local LLM and embedding models
 - [clap](https://github.com/clap-rs/clap) - Command-line argument parsing
 - [tokio](https://tokio.rs/) - Asynchronous runtime
+- [PostgreSQL](https://www.postgresql.org/) & [PostGIS](https://postgis.net/) - Spatial database
+
+---
+
+<div align="center">
+
+**[Get Started →](docs/quick-start.md)**
+
+</div>

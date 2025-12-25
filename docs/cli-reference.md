@@ -4,28 +4,31 @@ Complete reference for all GeoRAG CLI commands and options.
 
 ## Table of Contents
 
-- [Global Flags](#global-flags)
+- [Global Options](#global-options)
 - [Commands](#commands)
   - [init](#init)
   - [add](#add)
   - [build](#build)
   - [query](#query)
-  - [inspect](#inspect)
   - [status](#status)
-- [Environment Variables](#environment-variables)
+  - [migrate](#migrate)
+  - [db](#db)
+  - [doctor](#doctor)
+- [Configuration](#configuration)
 - [Exit Codes](#exit-codes)
 
-## Global Flags
+## Global Options
 
-These flags can be used with any command:
+These options can be used with any command:
 
-| Flag            | Description                             | Example                         |
-| --------------- | --------------------------------------- | ------------------------------- |
-| `--json`        | Output results in JSON format           | `georag status --json`          |
-| `--dry-run`     | Show planned actions without executing  | `georag init --dry-run`         |
-| `--explain`     | Show detailed explanation of operations | `georag query "text" --explain` |
-| `-h, --help`    | Print help information                  | `georag --help`                 |
-| `-V, --version` | Print version information               | `georag --version`              |
+| Option                | Description                             | Example                           |
+| --------------------- | --------------------------------------- | --------------------------------- |
+| `--json`              | Output results in JSON format           | `georag status --json`            |
+| `--dry-run`           | Show planned actions without executing  | `georag init --dry-run`           |
+| `--explain`           | Show detailed explanation of operations | `georag query "text" --explain`   |
+| `--storage <BACKEND>` | Storage backend: `memory` or `postgres` | `georag --storage postgres build` |
+| `-h, --help`          | Print help information                  | `georag --help`                   |
+| `-V, --version`       | Print version information               | `georag --version`                |
 
 ## Commands
 
@@ -49,12 +52,16 @@ georag init [PATH] [OPTIONS]
 - `--distance-unit <UNIT>` - Distance unit: meters, kilometers, miles, feet (default: meters)
 - `--validity-mode <MODE>` - Geometry validity mode: strict, lenient (default: lenient)
 - `--force` - Force overwrite if workspace already exists
+- `-i, --interactive` - Interactive mode with prompts
 
 **Examples:**
 
 ```bash
-# Initialize in current directory with defaults
+# Initialize in current directory
 georag init
+
+# Interactive setup
+georag init --interactive
 
 # Initialize with custom CRS
 georag init my-workspace --crs 3857
@@ -64,20 +71,7 @@ georag init my-workspace \
   --crs 4326 \
   --distance-unit kilometers \
   --validity-mode strict
-
-# Preview initialization
-georag init --dry-run
-
-# Get JSON output
-georag init --json
 ```
-
-**Output:**
-
-- Creates `.georag/` directory
-- Creates `config.toml` with specified settings
-- Creates `datasets/` and `index/` directories
-- Creates empty `datasets.json`
 
 ---
 
@@ -88,17 +82,18 @@ Add a geospatial dataset to the workspace.
 **Usage:**
 
 ```bash
-georag add <FILE> [OPTIONS]
+georag add <PATH> [OPTIONS]
 ```
 
 **Arguments:**
 
-- `<FILE>` - Path to the dataset file (GeoJSON, Shapefile, etc.)
+- `<PATH>` - Path to the dataset file (GeoJSON, Shapefile, etc.)
 
 **Options:**
 
 - `--name <NAME>` - Dataset name (default: filename)
 - `--force` - Override CRS mismatch warning
+- `-i, --interactive` - Interactive mode with prompts
 
 **Examples:**
 
@@ -106,34 +101,15 @@ georag add <FILE> [OPTIONS]
 # Add a dataset
 georag add data/cities.geojson
 
+# Interactive mode
+georag add --interactive
+
 # Add with custom name
 georag add data/cities.geojson --name "World Cities"
 
 # Force add despite CRS mismatch
 georag add data/cities.geojson --force
-
-# Preview addition
-georag add data/cities.geojson --dry-run
-
-# Get JSON output
-georag add data/cities.geojson --json
 ```
-
-**Output:**
-
-- Validates geometry
-- Extracts CRS metadata
-- Displays geometry type, feature count, and CRS
-- Warns if CRS differs from workspace CRS
-- Copies dataset to `.georag/datasets/`
-- Updates `datasets.json`
-
-**Validation:**
-
-- Checks if file exists
-- Validates GeoJSON format
-- Extracts geometry metadata
-- Detects CRS mismatches
 
 ---
 
@@ -163,29 +139,7 @@ georag build --embedder ollama:mxbai-embed-large
 
 # Force rebuild
 georag build --force
-
-# Preview build
-georag build --dry-run
-
-# Get JSON output
-georag build --json
 ```
-
-**Process:**
-
-1. Normalizes geometries to workspace CRS
-2. Validates and fixes invalid geometries
-3. Generates embeddings for text chunks
-4. Creates deterministic index hash
-5. Saves index state
-
-**Output:**
-
-- Index hash for reproducibility
-- Chunk count
-- Embedding dimensions
-- Embedder information
-- Normalization and fix counts
 
 **Requirements:**
 
@@ -215,12 +169,16 @@ georag query <QUERY> [OPTIONS]
 - `--distance <DISTANCE>` - Distance for proximity queries (e.g., "5km", "100m")
 - `--no-rerank` - Disable semantic reranking
 - `-k, --top-k <K>` - Number of results to return (default: 10)
+- `-i, --interactive` - Interactive query builder
 
 **Examples:**
 
 ```bash
 # Simple query
 georag query "What are the main features?"
+
+# Interactive query builder
+georag query --interactive
 
 # Query with spatial filter
 georag query "What cities are nearby?" \
@@ -238,111 +196,13 @@ georag query "What features exist?" --no-rerank
 
 # Get detailed explanation
 georag query "What's here?" --explain
-
-# Get JSON output
-georag query "What's here?" --json
 ```
-
-**Output:**
-
-- Query plan (spatial predicate, CRS, distance)
-- Spatial match count
-- Ranked results with sources
-- Explanation (with `--explain` flag)
-
-**Requirements:**
-
-- Index must be built
-- Ollama must be running (for semantic search)
-
----
-
-### inspect
-
-Inspect workspace state and metadata.
-
-**Usage:**
-
-```bash
-georag inspect <TARGET>
-```
-
-**Subcommands:**
-
-- `datasets` - Inspect registered datasets
-- `index` - Inspect index metadata
-- `crs` - Inspect CRS information
-- `config` - Inspect configuration
-
-**Examples:**
-
-#### Inspect Datasets
-
-```bash
-georag inspect datasets
-georag inspect datasets --json
-```
-
-**Output:**
-
-- Dataset ID, name, geometry type
-- Feature count
-- CRS
-- Added timestamp
-
-#### Inspect Index
-
-```bash
-georag inspect index
-georag inspect index --json
-```
-
-**Output:**
-
-- Index hash
-- Build timestamp
-- Embedder used
-- Chunk count
-- Embedding dimensions
-
-#### Inspect CRS
-
-```bash
-georag inspect crs
-georag inspect crs --json
-```
-
-**Output:**
-
-- Workspace CRS
-- Distance unit
-- Per-dataset CRS information
-- CRS match indicators
-
-#### Inspect Config
-
-```bash
-georag inspect config
-georag inspect config --json
-```
-
-**Output:**
-
-- Configuration values
-- Configuration sources (file, env, CLI, default)
-- Configuration precedence information
-
-**Requirements:**
-
-- Must be run within a GeoRAG workspace
-- No network access required
-- No LLM calls required
 
 ---
 
 ### status
 
-Show high-level workspace status.
+Show workspace status and information.
 
 **Usage:**
 
@@ -352,74 +212,286 @@ georag status [OPTIONS]
 
 **Options:**
 
-- `--verbose` - Show detailed status including storage information
+- `--verbose` - Show detailed status
+- `--datasets` - Show only datasets information
+- `--index` - Show only index information
+- `--crs` - Show only CRS information
+- `--config` - Show only configuration
 
 **Examples:**
 
 ```bash
-# Basic status
+# Show all information
 georag status
+
+# Show only datasets
+georag status --datasets
+
+# Show only index info
+georag status --index
+
+# Show only CRS info
+georag status --crs
+
+# Show only configuration
+georag status --config
 
 # Detailed status
 georag status --verbose
-
-# Get JSON output
-georag status --json
 ```
 
 **Output:**
 
-- Workspace location
-- Workspace CRS and distance unit
-- Dataset count
-- Index status (built/not built)
-- Index metadata (if built)
+- Workspace location and CRS
+- Dataset count and details
+- Index status and metadata
+- Configuration values and sources
 - Storage status (with `--verbose`)
-
-**Requirements:**
-
-- Must be run within a GeoRAG workspace
-- No network access required
-- No heavy computation
 
 ---
 
-## Environment Variables
+### migrate
 
-GeoRAG respects the following environment variables:
+Migrate data from in-memory storage to PostgreSQL.
 
-| Variable               | Description           | Example                                           |
-| ---------------------- | --------------------- | ------------------------------------------------- |
-| `GEORAG_CRS`           | Default CRS EPSG code | `export GEORAG_CRS=3857`                          |
-| `GEORAG_DISTANCE_UNIT` | Default distance unit | `export GEORAG_DISTANCE_UNIT=Kilometers`          |
-| `GEORAG_VALIDITY_MODE` | Default validity mode | `export GEORAG_VALIDITY_MODE=Strict`              |
-| `GEORAG_EMBEDDER`      | Default embedder      | `export GEORAG_EMBEDDER=ollama:mxbai-embed-large` |
+**Usage:**
 
-**Precedence:**
+```bash
+georag migrate --database-url <URL> [OPTIONS]
+```
+
+**Options:**
+
+- `--database-url <URL>` - PostgreSQL database URL (required)
+- `--batch-size <SIZE>` - Batch size for transferring records (default: 1000)
+- `--verify` - Verify data integrity after migration
+
+**Examples:**
+
+```bash
+# Migrate to PostgreSQL
+georag migrate --database-url postgresql://user:pass@localhost/georag
+
+# Preview migration
+georag migrate --database-url postgresql://localhost/georag --dry-run
+
+# Migrate with verification
+georag migrate --database-url postgresql://localhost/georag --verify
+
+# Custom batch size
+georag migrate --database-url postgresql://localhost/georag --batch-size 500
+```
+
+**Process:**
+
+1. Connects to PostgreSQL
+2. Runs migrations
+3. Transfers datasets
+4. Transfers features
+5. Transfers embeddings
+6. Optionally verifies integrity
+
+---
+
+### db
+
+Manage database operations (PostgreSQL only).
+
+**Usage:**
+
+```bash
+georag db <SUBCOMMAND> [OPTIONS]
+```
+
+**Subcommands:**
+
+- `rebuild` - Rebuild database indexes
+- `stats` - Show database statistics
+- `vacuum` - Run VACUUM and ANALYZE for maintenance
+
+#### db rebuild
+
+Rebuild database indexes for better performance.
+
+**Usage:**
+
+```bash
+georag db rebuild [OPTIONS]
+```
+
+**Options:**
+
+- `--index <NAME>` - Specific index to rebuild (rebuilds all if not specified)
+- `--concurrently` - Rebuild indexes concurrently (non-blocking, default: true)
+
+**Examples:**
+
+```bash
+# Rebuild all indexes
+georag db rebuild
+
+# Rebuild specific index
+georag db rebuild --index idx_features_geom
+
+# Preview rebuild
+georag db rebuild --dry-run
+```
+
+#### db stats
+
+Show database statistics.
+
+**Usage:**
+
+```bash
+georag db stats [OPTIONS]
+```
+
+**Options:**
+
+- `--index <NAME>` - Specific index to show stats for (shows all if not specified)
+
+**Examples:**
+
+```bash
+# Show all index statistics
+georag db stats
+
+# Show specific index stats
+georag db stats --index idx_features_geom
+
+# Get JSON output
+georag db stats --json
+```
+
+**Output:**
+
+- Index name and table
+- Index type
+- Size in bytes
+- Row count
+- Last vacuum/analyze timestamps
+
+#### db vacuum
+
+Run VACUUM and ANALYZE for database maintenance.
+
+**Usage:**
+
+```bash
+georag db vacuum [OPTIONS]
+```
+
+**Options:**
+
+- `--table <NAME>` - Specific table to vacuum (vacuums all if not specified)
+- `--analyze` - Run ANALYZE after VACUUM (default: true)
+- `--full` - Run FULL vacuum (locks table, reclaims more space)
+
+**Examples:**
+
+```bash
+# Vacuum all tables
+georag db vacuum
+
+# Vacuum specific table
+georag db vacuum --table features
+
+# Full vacuum
+georag db vacuum --full
+
+# Preview vacuum
+georag db vacuum --dry-run
+```
+
+---
+
+### doctor
+
+Run health checks and diagnostics.
+
+**Usage:**
+
+```bash
+georag doctor [OPTIONS]
+```
+
+**Options:**
+
+- `--verbose` - Show detailed diagnostic information
+
+**Examples:**
+
+```bash
+# Run health checks
+georag doctor
+
+# Detailed diagnostics
+georag doctor --verbose
+```
+
+**Checks:**
+
+- ✓ Workspace detection
+- ✓ Configuration validation
+- ✓ PostgreSQL connectivity (if configured)
+- ✓ Ollama availability
+- ✓ Dataset integrity
+- ✓ Index status
+
+**Output:**
+
+- Pass/fail status for each check
+- Suggestions for fixing issues
+- Overall health score
+
+---
+
+## Configuration
+
+### Configuration File
+
+GeoRAG supports `.georag/config.toml` for persistent configuration:
+
+```toml
+[storage]
+backend = "postgres"  # or "memory"
+
+[postgres]
+host = "localhost"
+port = 5432
+database = "georag"
+user = "postgres"
+# password can be in env var or .pgpass
+
+[postgres.pool]
+min_connections = 2
+max_connections = 10
+acquire_timeout = 30
+idle_timeout = 600
+
+[embedder]
+default = "ollama:nomic-embed-text"
+```
+
+### Environment Variables
+
+| Variable               | Description                  | Example                                           |
+| ---------------------- | ---------------------------- | ------------------------------------------------- |
+| `DATABASE_URL`         | PostgreSQL connection string | `postgresql://user:pass@localhost/georag`         |
+| `GEORAG_CRS`           | Default CRS EPSG code        | `export GEORAG_CRS=3857`                          |
+| `GEORAG_DISTANCE_UNIT` | Default distance unit        | `export GEORAG_DISTANCE_UNIT=Kilometers`          |
+| `GEORAG_EMBEDDER`      | Default embedder             | `export GEORAG_EMBEDDER=ollama:mxbai-embed-large` |
+
+### Configuration Precedence
 
 ```
 CLI Arguments > Environment Variables > Config File > Defaults
 ```
 
-**Example:**
-
-```bash
-# Set environment variables
-export GEORAG_CRS=3857
-export GEORAG_EMBEDDER=ollama:mxbai-embed-large
-
-# These will use the environment variables
-georag init
-georag build
-
-# CLI arguments override environment variables
-georag init --crs 4326
-georag build --embedder ollama:nomic-embed-text
-```
+---
 
 ## Exit Codes
-
-GeoRAG uses standard exit codes:
 
 | Code | Meaning     | Example                            |
 | ---- | ----------- | ---------------------------------- |
@@ -427,23 +499,72 @@ GeoRAG uses standard exit codes:
 | `1`  | Error       | Command failed (see error message) |
 | `2`  | Usage error | Invalid arguments or options       |
 
-**Examples:**
-
-```bash
-# Check exit code
-georag build
-echo $?  # 0 if successful, 1 if failed
-
-# Use in scripts
-if georag build; then
-  echo "Build successful"
-else
-  echo "Build failed"
-  exit 1
-fi
-```
+---
 
 ## Common Patterns
+
+### Complete Workflow
+
+```bash
+# 1. Initialize workspace
+georag init --interactive
+
+# 2. Add datasets
+georag add cities.geojson
+georag add roads.geojson
+
+# 3. Check status
+georag status
+
+# 4. Build index
+georag build
+
+# 5. Query
+georag query "major cities" --top-k 10
+
+# 6. Health check
+georag doctor
+```
+
+### Using PostgreSQL
+
+```bash
+# Set database URL
+export DATABASE_URL="postgresql://user:pass@localhost/georag"
+
+# Or use config file (.georag/config.toml)
+# [postgres]
+# host = "localhost"
+# database = "georag"
+
+# Initialize with PostgreSQL
+georag init --storage postgres
+
+# Add and build
+georag add data.geojson --storage postgres
+georag build --storage postgres
+
+# Query
+georag query "search" --storage postgres
+
+# Database maintenance
+georag db stats
+georag db rebuild
+georag db vacuum
+```
+
+### JSON Output
+
+```bash
+# Get JSON output
+georag status --json | jq '.data.crs'
+georag status --json | jq '.data.index.built'
+
+# Check build status
+if georag status --json | jq -e '.data.index.built == true'; then
+  echo "Index is built"
+fi
+```
 
 ### Scripting
 
@@ -466,100 +587,12 @@ georag build
 georag query "What features exist?" > results.txt
 ```
 
-### JSON Parsing
+---
 
-```bash
-# Extract specific fields
-georag status --json | jq '.data.crs'
-georag status --json | jq '.data.index.built'
+## Tips
 
-# Check build status
-if georag status --json | jq -e '.data.index.built == true'; then
-  echo "Index is built"
-fi
-```
-
-### Error Handling
-
-```bash
-# Capture output and errors
-if ! output=$(georag build --json 2>&1); then
-  echo "Build failed: $output"
-  exit 1
-fi
-
-# Parse error message
-error=$(echo "$output" | jq -r '.message')
-echo "Error: $error"
-```
-
-### Dry-Run Workflow
-
-```bash
-# Preview changes
-georag build --dry-run
-
-# Review output
-read -p "Proceed with build? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-  georag build
-fi
-```
-
-## Tips and Tricks
-
-### 1. Quick Status Check
-
-```bash
-# One-liner to check if workspace is ready
-georag status --json | jq -r 'if .data.index.built then "Ready" else "Not ready" end'
-```
-
-### 2. List All Datasets
-
-```bash
-# Get dataset names
-georag inspect datasets --json | jq -r '.data.datasets[].name'
-```
-
-### 3. Verify Index Hash
-
-```bash
-# Get current index hash
-current=$(georag inspect index --json | jq -r '.data.hash')
-
-# Rebuild and compare
-georag build --force
-new=$(georag inspect index --json | jq -r '.data.hash')
-
-if [ "$current" = "$new" ]; then
-  echo "Build is deterministic"
-fi
-```
-
-### 4. Configuration Audit
-
-```bash
-# See where each config value comes from
-georag inspect config --json | jq '.data | to_entries[] | "\(.key): \(.value.value) (from \(.value.source))"'
-```
-
-### 5. Batch Operations
-
-```bash
-# Add multiple datasets with error handling
-for file in data/*.geojson; do
-  if georag add "$file" --json > /dev/null 2>&1; then
-    echo "✓ Added: $file"
-  else
-    echo "✗ Failed: $file"
-  fi
-done
-```
-
-## See Also
-
-- [Output Formatting Guide](output-formatting.md) - JSON output and dry-run mode
-- [Configuration Guide](configuration.md) - Configuration management (coming soon)
-- [Examples](../examples/) - Example code and workflows
+1. **Use interactive mode**: `georag init --interactive`
+2. **Use doctor for troubleshooting**: `georag doctor`
+3. **Use config files for teams**: Share `.georag/config.toml`
+4. **Check status before querying**: `georag status`
+5. **Use --dry-run to preview**: `georag build --dry-run`

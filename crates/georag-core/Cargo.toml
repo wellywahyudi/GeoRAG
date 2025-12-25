@@ -12,8 +12,13 @@ serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 chrono.workspace = true
+async-trait.workspace = true
+geojson.workspace = true
+gdal = { version = "0.16", features = ["bindgen"] }
+gdal-sys = "0.9"
 
 [dev-dependencies]
 proptest.workspace = true
 tempfile = "3.8"
 serial_test = "3.0"
+tokio.workspace = true

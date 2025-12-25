@@ -56,6 +56,60 @@ pub enum GeoragError {
     // Serialization errors
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    // Format errors
+    #[error("Unsupported format: .{extension}. Supported formats: {}", supported.join(", "))]
+    UnsupportedFormat {
+        extension: String,
+        supported: Vec<String>,
+    },
+
+    #[error("Format error for {format}: {message}")]
+    FormatError {
+        format: String,
+        message: String,
+    },
+
+    #[error("Format validation failed for {format}: {reason}")]
+    FormatValidation {
+        format: String,
+        reason: String,
+    },
+
+    #[error("Document extraction failed for {format}: {reason}")]
+    DocumentExtraction {
+        format: String,
+        reason: String,
+    },
+
+    #[error("Layer '{layer}' not found. Available layers: {}", available.join(", "))]
+    LayerNotFound {
+        layer: String,
+        available: Vec<String>,
+    },
+
+    #[error("CRS extraction failed for {format}: {reason}")]
+    CrsExtraction {
+        format: String,
+        reason: String,
+    },
+
+    #[error("Missing required components for {format}: {}", missing.join(", "))]
+    ComponentMissing {
+        format: String,
+        missing: Vec<String>,
+    },
+
+    #[error("File not found: {path}")]
+    FileNotFound {
+        path: PathBuf,
+    },
+
+    #[error("Invalid path {path}: {reason}")]
+    InvalidPath {
+        path: PathBuf,
+        reason: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, GeoragError>;

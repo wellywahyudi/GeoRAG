@@ -7,6 +7,7 @@ use crate::output_types::{AddOutput, CrsMismatchInfo};
 use crate::storage::Storage;
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
+use georag_core::formats::{FormatRegistry, geojson::GeoJsonReader};
 use georag_core::models::{Dataset, DatasetId};
 use georag_core::models::dataset::GeometryType;
 use std::fs;
@@ -29,7 +30,36 @@ pub async fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool, storag
     let config: georag_core::models::WorkspaceConfig = toml::from_str(&config_content)
         .context("Failed to parse config.toml")?;
 
-    // Read and validate the dataset
+    // Create format registry and register GeoJSON reader
+    let mut registry = FormatRegistry::new();
+    registry.register(Box::new(GeoJsonReader));
+
+    // Detect format
+    let reader = registry.detect_format(&args.path)
+        .context("Failed to detect file format")?;
+
+    output.info(format!("Detected format: {}", reader.format_name()));
+
+    // Validate format
+    let validation = reader.validate(&args.path).await
+        .context("Failed to validate file")?;
+
+    if !validation.is_valid() {
+        for error in &validation.errors {
+            output.error(error.clone());
+        }
+        bail!("Format validation failed");
+    }
+
+    for warning in &validation.warnings {
+        output.warning(warning.clone());
+    }
+
+    // Read dataset using format reader
+    let format_dataset = reader.read(&args.path).await
+        .context("Failed to read dataset")?;
+
+    // Read and validate the dataset metadata (for backward compatibility)
     let (geometry_type, feature_count, crs) = read_dataset_metadata(&args.path)?;
 
     // Check for CRS mismatch
@@ -57,6 +87,7 @@ pub async fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool, storag
                 "Store dataset in database"
             )
             .with_detail(format!("Add dataset: {}", dataset_name))
+            .with_detail(format!("Format: {}", format_dataset.format_metadata.format_name))
             .with_detail(format!("Geometry Type: {:?}", geometry_type))
             .with_detail(format!("Feature Count: {}", feature_count))
             .with_detail(format!("CRS: EPSG:{}", crs)),
@@ -89,6 +120,14 @@ pub async fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool, storag
         geometry_type,
         feature_count,
         crs,
+        format: georag_core::models::dataset::FormatMetadata {
+            format_name: format_dataset.format_metadata.format_name.clone(),
+            format_version: format_dataset.format_metadata.format_version.clone(),
+            layer_name: format_dataset.format_metadata.layer_name.clone(),
+            page_count: format_dataset.format_metadata.page_count,
+            paragraph_count: format_dataset.format_metadata.paragraph_count,
+            extraction_method: format_dataset.format_metadata.extraction_method.clone(),
+        },
         added_at: Utc::now(),
     };
 
@@ -124,6 +163,7 @@ pub async fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool, storag
     } else {
         output.success(format!("Added dataset: {}", dataset_name));
         output.section("Dataset Information");
+        output.kv("Format", format_dataset.format_metadata.format_name);
         output.kv("Geometry Type", format!("{:?}", geometry_type));
         output.kv("Feature Count", feature_count);
         output.kv("CRS", format!("EPSG:{}", crs));

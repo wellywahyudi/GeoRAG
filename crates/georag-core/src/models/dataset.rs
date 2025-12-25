@@ -51,6 +51,9 @@ pub struct Dataset {
     /// CRS EPSG code
     pub crs: u32,
     
+    /// Format-specific metadata
+    pub format: FormatMetadata,
+    
     /// When the dataset was added
     pub added_at: DateTime<Utc>,
 }
@@ -65,4 +68,26 @@ pub enum GeometryType {
     MultiLineString,
     MultiPolygon,
     GeometryCollection,
+}
+
+/// Format-specific metadata for datasets
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormatMetadata {
+    /// Format name (e.g., "GeoJSON", "Shapefile", "PDF")
+    pub format_name: String,
+    
+    /// Optional format version
+    pub format_version: Option<String>,
+    
+    /// Optional layer name (for multi-layer formats like GeoPackage)
+    pub layer_name: Option<String>,
+    
+    /// Optional page count (for document formats like PDF)
+    pub page_count: Option<usize>,
+    
+    /// Optional paragraph count (for document formats like DOCX)
+    pub paragraph_count: Option<usize>,
+    
+    /// Optional extraction method (e.g., "GDAL", "pdf-extract", "docx-rs")
+    pub extraction_method: Option<String>,
 }
