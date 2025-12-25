@@ -4,10 +4,10 @@ mod init;
 mod add;
 mod build;
 mod query;
-mod inspect;
 mod status;
 mod migrate;
-mod index;
+mod db;
+mod doctor;
 
 use crate::cli::{Cli, Commands};
 use crate::output::OutputWriter;
@@ -26,9 +26,9 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Commands::Add(args) => add::execute(args, &output, cli.dry_run, &storage).await,
         Commands::Build(args) => build::execute(args, &output, cli.dry_run, &storage).await,
         Commands::Query(args) => query::execute(args, &output, cli.explain, &storage).await,
-        Commands::Inspect(args) => inspect::execute(args, &output),
         Commands::Status(args) => status::execute(args, &output),
         Commands::Migrate(args) => migrate::execute(args, &output, cli.dry_run),
-        Commands::Index(args) => index::execute(args, &output, cli.dry_run),
+        Commands::Db(args) => db::execute(args, &output, cli.dry_run),
+        Commands::Doctor(args) => doctor::execute(args, &output),
     }
 }

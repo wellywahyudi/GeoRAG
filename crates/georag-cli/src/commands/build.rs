@@ -1,7 +1,7 @@
 //! Build command implementation
 
 use crate::cli::BuildArgs;
-use crate::config_loader::{find_workspace_root, load_workspace_config_with_overrides};
+use crate::config::{find_workspace_root, load_workspace_config_with_overrides};
 use crate::dry_run::{display_planned_actions, ActionType, PlannedAction};
 use crate::output::OutputWriter;
 use crate::output_types::BuildOutput;

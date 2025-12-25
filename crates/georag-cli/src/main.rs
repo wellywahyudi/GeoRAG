@@ -4,11 +4,15 @@
 
 mod cli;
 mod commands;
-mod config_loader;
+mod config;
 mod dry_run;
 mod output;
 mod output_types;
 mod storage;
+mod interactive;
+mod progress;
+mod errors;
+mod auto_detect;
 
 use anyhow::Result;
 use clap::Parser;

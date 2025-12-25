@@ -1,12 +1,12 @@
-//! Index management commands
+//! Database management commands
 
-use crate::cli::{IndexArgs, IndexCommand};
+use crate::cli::{DbArgs, DbCommand};
 use crate::output::OutputWriter;
 use anyhow::{Result, Context};
 use georag_store::postgres::{PostgresStore, PostgresConfig};
 
-/// Execute index management commands
-pub fn execute(args: IndexArgs, output: &OutputWriter, dry_run: bool) -> Result<()> {
+/// Execute database management commands
+pub fn execute(args: DbArgs, output: &OutputWriter, dry_run: bool) -> Result<()> {
     // Create async runtime
     let rt = tokio::runtime::Runtime::new()
         .context("Failed to create async runtime")?;
@@ -22,13 +22,13 @@ pub fn execute(args: IndexArgs, output: &OutputWriter, dry_run: bool) -> Result<
             .context("Failed to connect to database")?;
 
         match args.command {
-            IndexCommand::Rebuild(rebuild_args) => {
+            DbCommand::Rebuild(rebuild_args) => {
                 execute_rebuild(&store, rebuild_args, output, dry_run).await
             }
-            IndexCommand::Stats(stats_args) => {
+            DbCommand::Stats(stats_args) => {
                 execute_stats(&store, stats_args, output).await
             }
-            IndexCommand::Vacuum(vacuum_args) => {
+            DbCommand::Vacuum(vacuum_args) => {
                 execute_vacuum(&store, vacuum_args, output, dry_run).await
             }
         }

@@ -2,6 +2,7 @@
 
 use crate::cli::InitArgs;
 use crate::dry_run::{display_planned_actions, ActionType, PlannedAction};
+use crate::interactive;
 use crate::output::OutputWriter;
 use crate::output_types::InitOutput;
 use anyhow::{bail, Context, Result};
@@ -10,25 +11,62 @@ use georag_core::models::workspace::WorkspaceConfig;
 use std::fs;
 
 pub fn execute(args: InitArgs, output: &OutputWriter, dry_run: bool) -> Result<()> {
-    // Parse distance unit
+    // If interactive mode, use interactive prompts
+    if args.interactive {
+        let interactive_result = interactive::interactive_init()?;
+        
+        // Use the interactive results
+        let distance_unit = parse_distance_unit(&interactive_result.distance_unit)?;
+        let validity_mode = parse_validity_mode(&interactive_result.validity_mode)?;
+        
+        let config = WorkspaceConfig {
+            crs: interactive_result.crs,
+            distance_unit,
+            geometry_validity: validity_mode,
+        };
+        
+        // Create workspace with interactive settings
+        create_workspace(&interactive_result.path, &config, output, dry_run)?;
+        
+        // If PostgreSQL was selected, create config file
+        if interactive_result.use_postgres {
+            if let Some(database_url) = interactive_result.database_url {
+                crate::config::ConfigFile::create_default(
+                    &interactive_result.path,
+                    true,
+                    Some(database_url),
+                )?;
+            }
+        }
+        
+        return Ok(());
+    }
+    
+    // Non-interactive mode (original behavior)
     let distance_unit = parse_distance_unit(&args.distance_unit)?;
-
-    // Parse validity mode
     let validity_mode = parse_validity_mode(&args.validity_mode)?;
 
-    // Create workspace config
     let config = WorkspaceConfig {
         crs: args.crs,
         distance_unit,
         geometry_validity: validity_mode,
     };
 
+    create_workspace(&args.path, &config, output, dry_run)
+}
+
+fn create_workspace(
+    path: &std::path::Path,
+    config: &WorkspaceConfig,
+    output: &OutputWriter,
+    dry_run: bool,
+) -> Result<()> {
     // Check if workspace already exists
-    let georag_dir = args.path.join(".georag");
-    if georag_dir.exists() && !args.force {
+    let georag_dir = path.join(".georag");
+    if georag_dir.exists() {
         bail!(
             "Workspace already exists at {}. Use --force to overwrite",
-            args.path.display()
+            path.display()
         );
     }
 
@@ -36,7 +74,7 @@ pub fn execute(args: InitArgs, output: &OutputWriter, dry_run: bool) -> Result<(
         let actions = vec![
             PlannedAction::new(
                 ActionType::CreateDirectory,
-                format!("Create .georag directory at {}", args.path.display())
+                format!("Create .georag directory at {}", path.display())
             ),
             PlannedAction::new(
                 ActionType::CreateFile,
@@ -112,7 +150,7 @@ geometry_validity = "{:?}"
     // Output success message
     if output.is_json() {
         let json_output = InitOutput {
-            workspace_path: args.path.display().to_string(),
+            workspace_path: path.display().to_string(),
             crs: config.crs,
             distance_unit: format!("{:?}", config.distance_unit),
             validity_mode: format!("{:?}", config.geometry_validity),
@@ -121,7 +159,7 @@ geometry_validity = "{:?}"
     } else {
         output.success(format!(
             "Initialized GeoRAG workspace at {}",
-            args.path.display()
+            path.display()
         ));
         
         output.section("Configuration");

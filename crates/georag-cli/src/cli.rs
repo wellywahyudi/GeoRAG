@@ -52,17 +52,17 @@ pub enum Commands {
     /// Query the index
     Query(QueryArgs),
 
-    /// Inspect workspace state
-    Inspect(InspectArgs),
-
-    /// Show workspace status
+    /// Show workspace status and information
     Status(StatusArgs),
 
     /// Migrate data from in-memory storage to PostgreSQL
     Migrate(MigrateArgs),
 
-    /// Manage database indexes
-    Index(IndexArgs),
+    /// Manage database operations
+    Db(DbArgs),
+
+    /// Run health checks and diagnostics
+    Doctor(DoctorArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -86,6 +86,10 @@ pub struct InitArgs {
     /// Force overwrite if workspace already exists
     #[arg(long)]
     pub force: bool,
+
+    /// Interactive mode - prompt for all settings
+    #[arg(long, short = 'i')]
+    pub interactive: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -100,6 +104,10 @@ pub struct AddArgs {
     /// Override CRS mismatch warning
     #[arg(long)]
     pub force: bool,
+
+    /// Interactive mode - prompt for settings
+    #[arg(long, short = 'i')]
+    pub interactive: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -137,28 +145,10 @@ pub struct QueryArgs {
     /// Number of results to return
     #[arg(long, short = 'k', default_value = "10")]
     pub top_k: usize,
-}
 
-#[derive(Parser, Debug)]
-pub struct InspectArgs {
-    /// What to inspect
-    #[command(subcommand)]
-    pub target: InspectTarget,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum InspectTarget {
-    /// Inspect registered datasets
-    Datasets,
-
-    /// Inspect the index
-    Index,
-
-    /// Inspect CRS information
-    Crs,
-
-    /// Inspect configuration
-    Config,
+    /// Interactive mode - build query with prompts
+    #[arg(long, short = 'i')]
+    pub interactive: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -166,6 +156,22 @@ pub struct StatusArgs {
     /// Show detailed status
     #[arg(long)]
     pub verbose: bool,
+
+    /// Show only datasets information
+    #[arg(long)]
+    pub datasets: bool,
+
+    /// Show only index information
+    #[arg(long)]
+    pub index: bool,
+
+    /// Show only CRS information
+    #[arg(long)]
+    pub crs: bool,
+
+    /// Show only configuration
+    #[arg(long)]
+    pub config: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -188,18 +194,18 @@ pub struct MigrateArgs {
 }
 
 #[derive(Parser, Debug)]
-pub struct IndexArgs {
-    /// Index management command
+pub struct DbArgs {
+    /// Database management command
     #[command(subcommand)]
-    pub command: IndexCommand,
+    pub command: DbCommand,
 }
 
 #[derive(Subcommand, Debug)]
-pub enum IndexCommand {
+pub enum DbCommand {
     /// Rebuild database indexes
     Rebuild(RebuildArgs),
 
-    /// Show index statistics
+    /// Show database statistics
     Stats(StatsArgs),
 
     /// Run VACUUM and ANALYZE for maintenance
@@ -237,4 +243,11 @@ pub struct VacuumArgs {
     /// Run FULL vacuum (locks table, reclaims more space)
     #[arg(long)]
     pub full: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct DoctorArgs {
+    /// Show detailed diagnostic information
+    #[arg(long)]
+    pub verbose: bool,
 }

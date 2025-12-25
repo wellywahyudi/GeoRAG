@@ -1,7 +1,7 @@
 //! Migrate command - Transfer data from in-memory storage to PostgreSQL
 
 use crate::cli::MigrateArgs;
-use crate::config_loader::load_workspace_config;
+use crate::config::load_workspace_config;
 use crate::output::OutputWriter;
 use anyhow::{Context, Result};
 use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore};
