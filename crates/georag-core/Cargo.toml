@@ -14,8 +14,8 @@ toml.workspace = true
 chrono.workspace = true
 async-trait.workspace = true
 geojson.workspace = true
-gdal = { version = "0.16", features = ["bindgen"] }
-gdal-sys = "0.9"
+shapefile = "0.5"
+wkt = "0.10"
 
 [dev-dependencies]
 proptest.workspace = true

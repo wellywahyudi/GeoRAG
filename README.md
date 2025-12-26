@@ -23,12 +23,14 @@ GeoRAG is a Rust library for building **location-aware RAG applications** that c
 ## Features
 
 - **Spatial-Aware Retrieval** - Combine geographic constraints with semantic search
+- **Pure Rust** - Zero system dependencies, fast builds, easy deployment
 - **Local-First** - All processing happens on your machine, no cloud dependencies
 - **Deterministic** - Reproducible index builds with hash verification
 - **CRS-Transparent** - Explicit coordinate reference system handling and validation
 - **Interactive CLI** - Guided prompts, progress bars, and helpful error messages
 - **Flexible Storage** - In-memory or PostgreSQL/PostGIS backends
 - **Inspectable** - Every operation can be explained, replayed, and debugged
+- **High Performance** - R\*-tree spatial indexing for fast queries
 
 ## Quick Start
 
@@ -207,53 +209,8 @@ The GeoRAG workspace is organized into focused crates:
 
 - Rust 1.70 or later
 - Cargo
-- GDAL library (libgdal-dev on Ubuntu/Debian, gdal on macOS via Homebrew)
-- PROJ library (libproj-dev on Ubuntu/Debian, proj on macOS via Homebrew)
 - Ollama (for embedding generation)
 - PostgreSQL with PostGIS (optional, for persistent storage)
-
-### Installing GDAL
-
-GDAL is required for reading Shapefile and GeoPackage formats.
-
-**Ubuntu/Debian:**
-
-```bash
-sudo apt-get update
-sudo apt-get install libgdal-dev libproj-dev
-```
-
-**macOS (Homebrew):**
-
-```bash
-brew install gdal proj
-```
-
-**Arch Linux:**
-
-```bash
-sudo pacman -S gdal proj
-```
-
-**Verify installation:**
-
-```bash
-gdal-config --version
-```
-
-If you encounter build issues, ensure `GDAL_HOME` points to your GDAL installation:
-
-```bash
-export GDAL_HOME=/usr/local  # or your GDAL installation path
-```
-
-**Troubleshooting:**
-
-If you see linking errors during build:
-
-- Ensure GDAL development headers are installed (not just the runtime)
-- On macOS, you may need to set: `export GDAL_HOME=$(brew --prefix gdal)`
-- On Linux, verify `pkg-config --modversion gdal` returns a version
 
 ### Building
 
@@ -348,7 +305,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 GeoRAG is built with excellent open-source tools:
 
 - [Rust](https://www.rust-lang.org/) - Systems programming language
-- [geo](https://github.com/georust/geo) - Geospatial primitives and algorithms
+- [GeoRust](https://georust.org/) - Pure Rust geospatial ecosystem
+  - [geo](https://github.com/georust/geo) - Geospatial primitives and algorithms
+  - [shapefile](https://github.com/tmontaigu/shapefile-rs) - Shapefile reading
+  - [rstar](https://github.com/georust/rstar) - R\*-tree spatial indexing
+  - [proj](https://github.com/georust/proj) - Coordinate transformations
 - [Ollama](https://ollama.ai/) - Local LLM and embedding models
 - [clap](https://github.com/clap-rs/clap) - Command-line argument parsing
 - [tokio](https://tokio.rs/) - Asynchronous runtime

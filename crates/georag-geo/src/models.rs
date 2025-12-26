@@ -97,7 +97,7 @@ impl From<&str> for FeatureId {
 }
 
 /// Geometry wrapper around geo crate types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Geometry {
     Point(geo::Point),
     LineString(geo::LineString),

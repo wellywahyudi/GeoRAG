@@ -10,7 +10,7 @@ use std::path::Path;
 use crate::error::Result;
 
 pub mod geojson;
-pub mod gdal_utils;
+pub mod shapefile;
 
 /// Format reader trait that all format implementations must implement
 #[async_trait]

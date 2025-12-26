@@ -7,3 +7,4 @@ pub mod models;
 pub mod validation;
 pub mod transform;
 pub mod spatial;
+pub mod index;
