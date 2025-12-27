@@ -85,3 +85,26 @@ fn test_format_metadata_document_format() {
     assert_eq!(deserialized.paragraph_count, Some(150));
     assert_eq!(deserialized.extraction_method, Some("pdf-extract".to_string()));
 }
+
+#[test]
+fn test_format_metadata_docx_format() {
+    // Create format metadata for a DOCX document format
+    let format = FormatMetadata {
+        format_name: "DOCX".to_string(),
+        format_version: None,
+        layer_name: None,
+        page_count: None,
+        paragraph_count: Some(42),
+        extraction_method: Some("docx-rs".to_string()),
+    };
+
+    // Test serialization
+    let json = serde_json::to_string(&format).expect("Failed to serialize");
+    
+    // Test deserialization
+    let deserialized: FormatMetadata = serde_json::from_str(&json).expect("Failed to deserialize");
+    assert_eq!(deserialized.format_name, "DOCX");
+    assert_eq!(deserialized.page_count, None);
+    assert_eq!(deserialized.paragraph_count, Some(42));
+    assert_eq!(deserialized.extraction_method, Some("docx-rs".to_string()));
+}

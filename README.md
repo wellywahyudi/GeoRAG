@@ -23,6 +23,7 @@ GeoRAG is a Rust library for building **location-aware RAG applications** that c
 ## Features
 
 - **Spatial-Aware Retrieval** - Combine geographic constraints with semantic search
+- **Multi-Format Support** - Import GeoJSON, Shapefile, GPX, KML, PDF, and DOCX files
 - **Pure Rust** - Zero system dependencies, fast builds, easy deployment
 - **Local-First** - All processing happens on your machine, no cloud dependencies
 - **Deterministic** - Reproducible index builds with hash verification
@@ -310,6 +311,10 @@ GeoRAG is built with excellent open-source tools:
   - [shapefile](https://github.com/tmontaigu/shapefile-rs) - Shapefile reading
   - [rstar](https://github.com/georust/rstar) - R\*-tree spatial indexing
   - [proj](https://github.com/georust/proj) - Coordinate transformations
+  - [gpx](https://github.com/georust/gpx) - GPS track parsing
+  - [kml](https://github.com/georust/kml) - KML/Google Earth format support
+- [pdf-extract](https://github.com/jrmuizel/pdf-extract) - PDF text extraction
+- [docx-rs](https://github.com/bokuweb/docx-rs) - DOCX document parsing
 - [Ollama](https://ollama.ai/) - Local LLM and embedding models
 - [clap](https://github.com/clap-rs/clap) - Command-line argument parsing
 - [tokio](https://tokio.rs/) - Asynchronous runtime

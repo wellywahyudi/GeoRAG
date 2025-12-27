@@ -13,6 +13,8 @@ pub mod geojson;
 pub mod shapefile;
 pub mod gpx;
 pub mod kml;
+pub mod pdf;
+pub mod docx;
 
 /// Format reader trait that all format implementations must implement
 #[async_trait]

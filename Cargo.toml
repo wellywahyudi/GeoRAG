@@ -36,6 +36,10 @@ wkt = "0.10"
 rstar = "0.12"
 gpx = "0.9"
 
+# Document formats
+pdf-extract = "0.7"
+docx-rs = "0.4"
+
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
 async-trait = "0.1"
