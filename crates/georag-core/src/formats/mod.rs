@@ -11,6 +11,7 @@ use crate::error::Result;
 
 pub mod geojson;
 pub mod shapefile;
+pub mod gpx;
 
 /// Format reader trait that all format implementations must implement
 #[async_trait]

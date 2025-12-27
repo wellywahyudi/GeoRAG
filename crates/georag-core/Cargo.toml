@@ -16,6 +16,7 @@ async-trait.workspace = true
 geojson.workspace = true
 shapefile = "0.5"
 wkt = "0.10"
+gpx = "0.9"
 
 [dev-dependencies]
 proptest.workspace = true
