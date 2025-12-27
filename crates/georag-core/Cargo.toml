@@ -17,6 +17,7 @@ geojson.workspace = true
 shapefile = "0.5"
 wkt = "0.10"
 gpx = "0.9"
+kml = "0.8"
 
 [dev-dependencies]
 proptest.workspace = true
