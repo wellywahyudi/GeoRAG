@@ -90,4 +90,23 @@ pub struct FormatMetadata {
     
     /// Optional extraction method (e.g., "GDAL", "pdf-extract", "docx-rs")
     pub extraction_method: Option<String>,
+    
+    /// Spatial association metadata for documents
+    pub spatial_association: Option<SpatialAssociation>,
+}
+
+/// Spatial association metadata for documents
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpatialAssociation {
+    /// Source of the spatial association (e.g., "manual", "file", "geocoding")
+    pub source: String,
+    
+    /// Path to the geometry file if association came from a file
+    pub geometry_file: Option<PathBuf>,
+    
+    /// Timestamp when association was created
+    pub associated_at: DateTime<Utc>,
+    
+    /// Description of the association
+    pub description: Option<String>,
 }

@@ -95,6 +95,7 @@ impl FormatReader for DocxReader {
                 page_count: None,
                 paragraph_count: Some(paragraphs.len()),
                 extraction_method: Some("docx-rs".to_string()),
+                spatial_association: None,
             },
             crs: 4326, // Default to WGS84 for documents
             features: vec![feature],

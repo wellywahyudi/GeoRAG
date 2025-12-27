@@ -45,6 +45,7 @@ impl FormatReader for GeoJsonReader {
                 page_count: None,
                 paragraph_count: None,
                 extraction_method: None,
+                spatial_association: None,
             },
             crs,
             features,

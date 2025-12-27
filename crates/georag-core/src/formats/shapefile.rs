@@ -55,6 +55,7 @@ impl FormatReader for ShapefileFormatReader {
                 page_count: None,
                 paragraph_count: None,
                 extraction_method: Some("shapefile-rs".to_string()),
+                spatial_association: None,
             },
             crs,
             features,

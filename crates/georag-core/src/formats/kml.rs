@@ -55,6 +55,7 @@ impl FormatReader for KmlReader {
                 page_count: None,
                 paragraph_count: None,
                 extraction_method: Some("kml-rs".to_string()),
+                spatial_association: None,
             },
             crs: 4326, // KML always uses WGS84 (EPSG:4326)
             features,

@@ -66,6 +66,7 @@ impl FormatReader for PdfReader {
                 page_count: Some(page_count),
                 paragraph_count: None,
                 extraction_method: Some("pdf-extract".to_string()),
+                spatial_association: None,
             },
             crs: 4326, // Default to WGS84 for documents
             features: vec![feature],

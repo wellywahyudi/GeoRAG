@@ -29,6 +29,42 @@ pub trait FormatReader: Send + Sync {
     /// A `Dataset` containing the parsed data
     async fn read(&self, path: &Path) -> Result<FormatDataset>;
 
+    /// Read a dataset with an associated geometry
+    ///
+    /// This is primarily used for document formats (PDF, DOCX) that don't have
+    /// inherent spatial information but can be associated with a location.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the file to read
+    /// * `geometry` - GeoJSON-like geometry to associate with the document
+    ///
+    /// # Returns
+    /// A `Dataset` with features that have the associated geometry
+    async fn read_with_geometry(
+        &self,
+        path: &Path,
+        geometry: serde_json::Value,
+    ) -> Result<FormatDataset> {
+        // Default implementation: read normally and associate geometry
+        let mut dataset = self.read(path).await?;
+        
+        // Associate geometry with all features
+        for feature in &mut dataset.features {
+            if feature.geometry.is_none() {
+                feature.geometry = Some(geometry.clone());
+            }
+        }
+        
+        // Update metadata to indicate spatial association
+        dataset.format_metadata.spatial_association = Some(SpatialAssociationInfo {
+            source: "manual".to_string(),
+            geometry_file: None,
+            description: Some("Geometry manually associated with document".to_string()),
+        });
+        
+        Ok(dataset)
+    }
+
     /// Get supported file extensions (e.g., ["shp", "geojson"])
     fn supported_extensions(&self) -> &[&str];
 
@@ -105,6 +141,22 @@ pub struct FormatMetadata {
     
     /// Extraction method used (e.g., "GDAL", "pdf-extract")
     pub extraction_method: Option<String>,
+    
+    /// Spatial association metadata for documents
+    pub spatial_association: Option<SpatialAssociationInfo>,
+}
+
+/// Spatial association information for documents
+#[derive(Debug, Clone)]
+pub struct SpatialAssociationInfo {
+    /// Source of the spatial association (e.g., "manual", "file", "geocoding")
+    pub source: String,
+    
+    /// Path to the geometry file if association came from a file
+    pub geometry_file: Option<std::path::PathBuf>,
+    
+    /// Description of the association
+    pub description: Option<String>,
 }
 
 /// Feature extracted from a format
@@ -210,6 +262,7 @@ mod tests {
                     page_count: None,
                     paragraph_count: None,
                     extraction_method: None,
+                    spatial_association: None,
                 },
                 crs: 4326,
                 features: vec![],

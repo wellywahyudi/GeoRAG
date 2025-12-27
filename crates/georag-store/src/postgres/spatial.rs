@@ -138,6 +138,7 @@ impl SpatialStore for PostgresStore {
                         page_count: None,
                         paragraph_count: None,
                         extraction_method: None,
+                        spatial_association: None,
                     },
                     added_at: row.get("created_at"),
                 };
@@ -382,7 +383,7 @@ impl SpatialStore for PostgresStore {
 
                 Feature {
                     id,
-                    geometry,
+                    geometry: Some(geometry),
                     properties: properties_map,
                     crs: filter.crs,
                 }
@@ -424,7 +425,7 @@ impl SpatialStore for PostgresStore {
 
                 Ok(Some(Feature {
                     id,
-                    geometry,
+                    geometry: Some(geometry),
                     properties: properties_map,
                     crs: 4326, // Default CRS
                 }))

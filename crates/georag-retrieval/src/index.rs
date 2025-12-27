@@ -126,14 +126,16 @@ where
         let mut fixed_count = 0;
 
         for feature in features {
-            // Parse geometry from JSON
-            if let Ok(geom) = serde_json::from_value::<georag_geo::models::Geometry>(feature.geometry.clone()) {
-                // Validate geometry
-                let validation_result = validate_geometry(&geom, ValidityMode::Lenient);
-                if !validation_result.is_valid {
-                    // In a full implementation, we would attempt to fix the geometry
-                    // For now, we just count invalid geometries
-                    fixed_count += 1;
+            // Parse geometry from JSON (skip features without geometry)
+            if let Some(geometry_value) = &feature.geometry {
+                if let Ok(geom) = serde_json::from_value::<georag_geo::models::Geometry>(geometry_value.clone()) {
+                    // Validate geometry
+                    let validation_result = validate_geometry(&geom, ValidityMode::Lenient);
+                    if !validation_result.is_valid {
+                        // In a full implementation, we would attempt to fix the geometry
+                        // For now, we just count invalid geometries
+                        fixed_count += 1;
+                    }
                 }
             }
         }

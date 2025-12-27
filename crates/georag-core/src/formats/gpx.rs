@@ -257,14 +257,15 @@ impl GpxReader {
 
     /// Extract GPX metadata
     fn extract_metadata(&self, gpx: &Gpx) -> FormatMetadata {
-        let metadata = FormatMetadata {
+        FormatMetadata {
             format_name: "GPX".to_string(),
             format_version: gpx.version.to_string().into(),
             layer_name: None,
             page_count: None,
             paragraph_count: None,
             extraction_method: Some("gpx-rs".to_string()),
-        };
+            spatial_association: None,
+        }
 
         // Note: Additional GPX metadata (creator, time, bounds) is available in the Gpx struct
         // but not stored in FormatMetadata. These can be accessed via:
@@ -274,8 +275,6 @@ impl GpxReader {
         // - gpx.metadata.time
         // - gpx.metadata.bounds
         // This metadata is preserved in the GPX structure and can be used for filtering/queries
-
-        metadata
     }
 }
 

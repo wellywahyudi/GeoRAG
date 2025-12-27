@@ -16,13 +16,65 @@ pub struct Feature {
     pub id: FeatureId,
     
     /// Geometry (stored as GeoJSON-like structure)
-    pub geometry: serde_json::Value,
+    /// None for documents without inherent spatial location
+    pub geometry: Option<serde_json::Value>,
     
     /// Feature properties
     pub properties: HashMap<String, serde_json::Value>,
     
     /// CRS EPSG code
     pub crs: u32,
+}
+
+impl Feature {
+    /// Create a new feature with geometry
+    pub fn with_geometry(
+        id: FeatureId,
+        geometry: serde_json::Value,
+        properties: HashMap<String, serde_json::Value>,
+        crs: u32,
+    ) -> Self {
+        Self {
+            id,
+            geometry: Some(geometry),
+            properties,
+            crs,
+        }
+    }
+
+    /// Create a new feature without geometry (for documents)
+    pub fn without_geometry(
+        id: FeatureId,
+        properties: HashMap<String, serde_json::Value>,
+        crs: u32,
+    ) -> Self {
+        Self {
+            id,
+            geometry: None,
+            properties,
+            crs,
+        }
+    }
+
+    /// Associate a geometry with this feature
+    ///
+    /// This is useful for documents that are initially created without geometry
+    /// but later associated with a spatial location.
+    pub fn associate_geometry(&mut self, geometry: serde_json::Value) {
+        self.geometry = Some(geometry);
+    }
+
+    /// Check if this feature has geometry
+    pub fn has_geometry(&self) -> bool {
+        self.geometry.is_some()
+    }
+
+    /// Check if this feature should be included in spatial queries
+    ///
+    /// Features without geometry should be excluded from spatial filtering
+    pub fn is_spatially_queryable(&self) -> bool {
+        self.has_geometry()
+    }
 }
 
 /// Spatial filter for queries

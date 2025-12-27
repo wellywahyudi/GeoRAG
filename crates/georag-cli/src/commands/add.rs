@@ -127,6 +127,7 @@ pub async fn execute(args: AddArgs, output: &OutputWriter, dry_run: bool, storag
             page_count: format_dataset.format_metadata.page_count,
             paragraph_count: format_dataset.format_metadata.paragraph_count,
             extraction_method: format_dataset.format_metadata.extraction_method.clone(),
+            spatial_association: None, // No spatial association by default
         },
         added_at: Utc::now(),
     };
