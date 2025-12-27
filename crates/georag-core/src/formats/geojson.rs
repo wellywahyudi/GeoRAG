@@ -7,6 +7,7 @@ use std::path::Path;
 
 use crate::error::{GeoragError, Result};
 use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
+use crate::formats::validation::FormatValidator;
 
 /// GeoJSON format reader
 pub struct GeoJsonReader;
@@ -59,27 +60,31 @@ impl FormatReader for GeoJsonReader {
     }
 
     async fn validate(&self, path: &Path) -> Result<FormatValidation> {
-        let mut validation = FormatValidation::default();
-
-        // Check if file exists
-        if !path.exists() {
-            validation.errors.push(format!("File not found: {}", path.display()));
+        // Basic file validation
+        let mut validation = FormatValidator::validate_file_exists(path);
+        if !validation.is_valid() {
             return Ok(validation);
         }
 
-        // Try to read and parse the file
-        match fs::read_to_string(path) {
-            Ok(content) => {
-                if let Err(e) = content.parse::<geojson::GeoJson>() {
-                    validation.errors.push(format!("Invalid GeoJSON: {}", e));
+        // Validate JSON structure
+        let json_validation = FormatValidator::validate_json_structure(path);
+        
+        // If JSON is valid, try to parse as GeoJSON
+        if json_validation.is_valid() {
+            match fs::read_to_string(path) {
+                Ok(content) => {
+                    if let Err(e) = content.parse::<geojson::GeoJson>() {
+                        validation.errors.push(format!("Invalid GeoJSON: {}", e));
+                    }
                 }
-            }
-            Err(e) => {
-                validation.errors.push(format!("Cannot read file: {}", e));
+                Err(e) => {
+                    validation.errors.push(format!("Cannot read file: {}", e));
+                }
             }
         }
 
-        Ok(validation)
+        // Merge validations
+        Ok(FormatValidator::merge_validations(vec![validation, json_validation]))
     }
 }
 

@@ -10,6 +10,7 @@ use std::path::Path;
 
 use crate::error::{GeoragError, Result};
 use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
+use crate::formats::validation::FormatValidator;
 
 /// DOCX format reader
 pub struct DocxReader;
@@ -109,11 +110,9 @@ impl FormatReader for DocxReader {
     }
 
     async fn validate(&self, path: &Path) -> Result<FormatValidation> {
-        let mut validation = FormatValidation::default();
-
-        // Check if file exists
-        if !path.exists() {
-            validation.errors.push(format!("File not found: {}", path.display()));
+        // Basic file validation
+        let mut validation = FormatValidator::validate_file_exists(path);
+        if !validation.is_valid() {
             return Ok(validation);
         }
 

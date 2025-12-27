@@ -15,6 +15,7 @@ pub mod gpx;
 pub mod kml;
 pub mod pdf;
 pub mod docx;
+pub mod validation;
 
 /// Format reader trait that all format implementations must implement
 #[async_trait]

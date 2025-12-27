@@ -12,6 +12,7 @@ use std::path::Path;
 
 use crate::error::{GeoragError, Result};
 use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
+use crate::formats::validation::FormatValidator;
 
 /// GPX format reader
 pub struct GpxReader;
@@ -72,28 +73,32 @@ impl FormatReader for GpxReader {
     }
 
     async fn validate(&self, path: &Path) -> Result<FormatValidation> {
-        let mut validation = FormatValidation::default();
-
-        // Check if file exists
-        if !path.exists() {
-            validation.errors.push(format!("File not found: {}", path.display()));
+        // Basic file validation
+        let mut validation = FormatValidator::validate_file_exists(path);
+        if !validation.is_valid() {
             return Ok(validation);
         }
 
-        // Try to parse the GPX file
-        match File::open(path) {
-            Ok(file) => {
-                let reader = BufReader::new(file);
-                if let Err(e) = read(reader) {
-                    validation.errors.push(format!("Invalid GPX: {}", e));
+        // Validate XML structure
+        let xml_validation = FormatValidator::validate_xml_structure(path);
+        
+        // If XML is valid, try to parse as GPX
+        if xml_validation.is_valid() {
+            match File::open(path) {
+                Ok(file) => {
+                    let reader = BufReader::new(file);
+                    if let Err(e) = read(reader) {
+                        validation.errors.push(format!("Invalid GPX: {}", e));
+                    }
                 }
-            }
-            Err(e) => {
-                validation.errors.push(format!("Cannot read file: {}", e));
+                Err(e) => {
+                    validation.errors.push(format!("Cannot read file: {}", e));
+                }
             }
         }
 
-        Ok(validation)
+        // Merge validations
+        Ok(FormatValidator::merge_validations(vec![validation, xml_validation]))
     }
 }
 

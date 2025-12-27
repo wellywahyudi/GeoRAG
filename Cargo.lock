@@ -1168,6 +1168,7 @@ dependencies = [
  "kml",
  "pdf-extract",
  "proptest",
+ "quick-xml 0.31.0",
  "serde",
  "serde_json",
  "serial_test",
@@ -1838,7 +1839,7 @@ checksum = "15ee323a0101f0a088261d45379c1127038a0df04991975e76c4ce427b4bfd6d"
 dependencies = [
  "geo-types",
  "num-traits",
- "quick-xml",
+ "quick-xml 0.37.5",
  "thiserror 1.0.69",
  "zip 2.4.2",
 ]
@@ -2445,6 +2446,15 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "quick-xml"

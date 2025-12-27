@@ -21,6 +21,7 @@ kml = "0.8"
 pdf-extract.workspace = true
 docx-rs.workspace = true
 tracing.workspace = true
+quick-xml.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

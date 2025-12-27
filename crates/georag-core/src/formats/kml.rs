@@ -11,6 +11,7 @@ use std::path::Path;
 
 use crate::error::{GeoragError, Result};
 use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
+use crate::formats::validation::FormatValidator;
 
 /// KML format reader
 pub struct KmlReader;
@@ -69,27 +70,31 @@ impl FormatReader for KmlReader {
     }
 
     async fn validate(&self, path: &Path) -> Result<FormatValidation> {
-        let mut validation = FormatValidation::default();
-
-        // Check if file exists
-        if !path.exists() {
-            validation.errors.push(format!("File not found: {}", path.display()));
+        // Basic file validation
+        let mut validation = FormatValidator::validate_file_exists(path);
+        if !validation.is_valid() {
             return Ok(validation);
         }
 
-        // Try to parse the KML file
-        match fs::read_to_string(path) {
-            Ok(content) => {
-                if let Err(e) = content.parse::<Kml>() {
-                    validation.errors.push(format!("Invalid KML: {}", e));
+        // Validate XML structure
+        let xml_validation = FormatValidator::validate_xml_structure(path);
+        
+        // If XML is valid, try to parse as KML
+        if xml_validation.is_valid() {
+            match fs::read_to_string(path) {
+                Ok(content) => {
+                    if let Err(e) = content.parse::<Kml>() {
+                        validation.errors.push(format!("Invalid KML: {}", e));
+                    }
                 }
-            }
-            Err(e) => {
-                validation.errors.push(format!("Cannot read file: {}", e));
+                Err(e) => {
+                    validation.errors.push(format!("Cannot read file: {}", e));
+                }
             }
         }
 
-        Ok(validation)
+        // Merge validations
+        Ok(FormatValidator::merge_validations(vec![validation, xml_validation]))
     }
 }
 

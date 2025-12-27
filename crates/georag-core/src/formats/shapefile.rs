@@ -15,6 +15,7 @@ use std::str::FromStr;
 
 use crate::error::{GeoragError, Result};
 use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
+use crate::formats::validation::FormatValidator;
 
 /// Shapefile format reader
 pub struct ShapefileFormatReader;
@@ -69,11 +70,9 @@ impl FormatReader for ShapefileFormatReader {
     }
 
     async fn validate(&self, path: &Path) -> Result<FormatValidation> {
-        let mut validation = FormatValidation::default();
-
-        // Check if file exists
-        if !path.exists() {
-            validation.errors.push(format!("File not found: {}", path.display()));
+        // Basic file validation
+        let mut validation = FormatValidator::validate_file_exists(path);
+        if !validation.is_valid() {
             return Ok(validation);
         }
 
@@ -86,25 +85,15 @@ impl FormatReader for ShapefileFormatReader {
             }
         };
 
-        let required = vec!["shp", "shx", "dbf"];
-        for ext in required {
-            let component = base.with_extension(ext);
-            if !component.exists() {
-                validation.errors.push(
-                    format!("Missing required file: {}", component.display())
-                );
-            }
-        }
+        // Validate component files using centralized validator
+        let component_validation = FormatValidator::validate_component_files(
+            &base,
+            &["shp", "shx", "dbf"],
+            &["prj"],
+        );
 
-        // Check for optional .prj file
-        let prj = base.with_extension("prj");
-        if !prj.exists() {
-            validation.warnings.push(
-                "No .prj file found, CRS may be ambiguous".to_string()
-            );
-        }
-
-        Ok(validation)
+        // Merge validations
+        Ok(FormatValidator::merge_validations(vec![validation, component_validation]))
     }
 }
 
