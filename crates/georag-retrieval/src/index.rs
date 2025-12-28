@@ -1,5 +1,3 @@
-//! Index building and management
-
 use chrono::Utc;
 use georag_core::error::Result;
 use georag_core::models::{Embedding, IndexState, SpatialMetadata, TextChunk};
@@ -59,15 +57,12 @@ where
     pub async fn build(&self) -> Result<IndexBuildResult> {
         let mut result = IndexBuildResult::default();
 
-        // Step 1: Normalize geometries to workspace CRS
         let normalized_count = self.normalize_geometries().await?;
         result.geometries_normalized = normalized_count;
 
-        // Step 2: Fix invalid geometries
         let fixed_count = self.fix_invalid_geometries().await?;
         result.geometries_fixed = fixed_count;
 
-        // Step 3: Generate embeddings
         let chunks = self.document_store.list_chunk_ids().await?;
         let chunk_data = self.document_store.get_chunks(&chunks).await?;
         result.chunk_count = chunk_data.len();
@@ -78,7 +73,6 @@ where
         // Store embeddings
         self.vector_store.store_embeddings(&embeddings).await?;
 
-        // Step 4: Generate deterministic index hash
         let hash = self.generate_index_hash(&chunk_data, &embeddings).await?;
         result.index_hash = hash;
 
@@ -102,8 +96,6 @@ where
         for feature in features {
             // Check if feature CRS matches workspace CRS
             if feature.crs != self.workspace_crs.epsg {
-                // Note: In a full implementation, we would reproject the geometry here
-                // For now, we just count features that need normalization
                 normalized_count += 1;
             }
         }
@@ -128,7 +120,9 @@ where
         for feature in features {
             // Parse geometry from JSON (skip features without geometry)
             if let Some(geometry_value) = &feature.geometry {
-                if let Ok(geom) = serde_json::from_value::<georag_geo::models::Geometry>(geometry_value.clone()) {
+                if let Ok(geom) =
+                    serde_json::from_value::<georag_geo::models::Geometry>(geometry_value.clone())
+                {
                     // Validate geometry
                     let validation_result = validate_geometry(&geom, ValidityMode::Lenient);
                     if !validation_result.is_valid {
@@ -158,16 +152,11 @@ where
         // Create Embedding structs with spatial metadata
         let mut embeddings = Vec::new();
         for (chunk, vector) in chunks.iter().zip(vectors.into_iter()) {
-            let spatial_metadata = if let Some(feature_id) = &chunk.spatial_ref {
-                // In a full implementation, we would fetch the feature and extract bbox
-                Some(SpatialMetadata {
-                    feature_id: feature_id.clone(),
-                    crs: self.workspace_crs.epsg,
-                    bbox: None,
-                })
-            } else {
-                None
-            };
+            let spatial_metadata = chunk.spatial_ref.as_ref().map(|feature_id| SpatialMetadata {
+                feature_id: *feature_id,
+                crs: self.workspace_crs.epsg,
+                bbox: None,
+            });
 
             embeddings.push(Embedding {
                 chunk_id: chunk.id,

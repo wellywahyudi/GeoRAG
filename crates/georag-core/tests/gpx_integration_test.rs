@@ -1,17 +1,17 @@
 //! Integration tests for GPX format reader
 
-use georag_core::formats::{FormatReader, gpx::GpxReader};
+use georag_core::formats::{gpx::GpxReader, FormatReader};
 use std::fs;
 use tempfile::TempDir;
 
 #[tokio::test]
 async fn test_gpx_complete_workflow() {
     let reader = GpxReader;
-    
+
     // Create a temporary GPX file with all feature types
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("complete.gpx");
-    
+
     let gpx_content = r#"<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="test">
   <metadata>
@@ -45,34 +45,34 @@ async fn test_gpx_complete_workflow() {
     </rtept>
   </rte>
 </gpx>"#;
-    
+
     fs::write(&file_path, gpx_content).unwrap();
-    
+
     // Read the GPX file
     let result = reader.read(&file_path).await.unwrap();
-    
+
     // Verify basic metadata
     assert_eq!(result.name, "complete");
     assert_eq!(result.format_metadata.format_name, "GPX");
     assert_eq!(result.crs, 4326); // GPX always uses WGS84
-    
+
     // Verify we have all three feature types
     assert_eq!(result.features.len(), 3); // 1 waypoint + 1 track + 1 route
-    
+
     // Verify waypoint
     let waypoint = result.features.iter().find(|f| f.id.starts_with("waypoint")).unwrap();
     assert!(waypoint.geometry.is_some());
     assert_eq!(waypoint.geometry.as_ref().unwrap()["type"], "Point");
     assert_eq!(waypoint.properties.get("type").unwrap(), "waypoint");
     assert_eq!(waypoint.properties.get("name").unwrap(), "Waypoint 1");
-    
+
     // Verify track
     let track = result.features.iter().find(|f| f.id.starts_with("track")).unwrap();
     assert!(track.geometry.is_some());
     assert_eq!(track.geometry.as_ref().unwrap()["type"], "LineString");
     assert_eq!(track.properties.get("type").unwrap(), "track");
     assert_eq!(track.properties.get("name").unwrap(), "Track 1");
-    
+
     // Verify route
     let route = result.features.iter().find(|f| f.id.starts_with("route")).unwrap();
     assert!(route.geometry.is_some());
@@ -84,10 +84,10 @@ async fn test_gpx_complete_workflow() {
 #[tokio::test]
 async fn test_gpx_elevation_handling() {
     let reader = GpxReader;
-    
+
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("elevation.gpx");
-    
+
     let gpx_content = r#"<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="test">
   <wpt lat="47.644548" lon="-122.326897">
@@ -110,17 +110,17 @@ async fn test_gpx_elevation_handling() {
     </trkseg>
   </trk>
 </gpx>"#;
-    
+
     fs::write(&file_path, gpx_content).unwrap();
-    
+
     let result = reader.read(&file_path).await.unwrap();
-    
+
     // Check waypoint has 3D coordinates
     let waypoint = &result.features[0];
     let coords = &waypoint.geometry.as_ref().unwrap()["coordinates"];
     assert_eq!(coords.as_array().unwrap().len(), 3); // [lon, lat, ele]
     assert_eq!(coords[2], 100.5);
-    
+
     // Check track has 3D coordinates
     let track = &result.features[1];
     let track_coords = &track.geometry.as_ref().unwrap()["coordinates"];
@@ -133,10 +133,10 @@ async fn test_gpx_elevation_handling() {
 #[tokio::test]
 async fn test_gpx_track_segments() {
     let reader = GpxReader;
-    
+
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("segments.gpx");
-    
+
     let gpx_content = r#"<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="test">
   <trk>
@@ -159,18 +159,18 @@ async fn test_gpx_track_segments() {
     </trkseg>
   </trk>
 </gpx>"#;
-    
+
     fs::write(&file_path, gpx_content).unwrap();
-    
+
     let result = reader.read(&file_path).await.unwrap();
-    
+
     // Should have 2 features (one per segment)
     assert_eq!(result.features.len(), 2);
-    
+
     // Verify both are tracks with correct segment numbers
     assert_eq!(result.features[0].id, "track_0_0");
     assert_eq!(result.features[0].properties.get("segment").unwrap(), 0);
-    
+
     assert_eq!(result.features[1].id, "track_0_1");
     assert_eq!(result.features[1].properties.get("segment").unwrap(), 1);
 }
@@ -178,10 +178,10 @@ async fn test_gpx_track_segments() {
 #[tokio::test]
 async fn test_gpx_metadata_extraction() {
     let reader = GpxReader;
-    
+
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("metadata.gpx");
-    
+
     let gpx_content = r#"<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="GeoRAG">
   <wpt lat="47.644548" lon="-122.326897">
@@ -189,16 +189,16 @@ async fn test_gpx_metadata_extraction() {
     <desc>A test description</desc>
   </wpt>
 </gpx>"#;
-    
+
     fs::write(&file_path, gpx_content).unwrap();
-    
+
     let result = reader.read(&file_path).await.unwrap();
-    
+
     // Verify format metadata
     assert_eq!(result.format_metadata.format_name, "GPX");
     assert!(result.format_metadata.format_version.is_some());
     assert_eq!(result.format_metadata.extraction_method, Some("gpx-rs".to_string()));
-    
+
     // Verify feature metadata
     let waypoint = &result.features[0];
     assert_eq!(waypoint.properties.get("name").unwrap(), "Test Point");

@@ -1,22 +1,9 @@
-//! Transaction support for PostgreSQL storage
-//!
-//! This module provides a transaction wrapper that handles:
-//! - Transaction lifecycle (begin, commit, rollback)
-//! - Timeout handling for long-running transactions
-//! - Proper error handling and resource cleanup
-
+use georag_core::error::{GeoragError, Result};
 use sqlx::{PgPool, Postgres, Transaction as SqlxTransaction};
-use georag_core::error::{Result, GeoragError};
 use std::time::Duration;
 use tokio::time::timeout;
 
 /// Transaction wrapper that provides ACID guarantees
-///
-/// This wrapper ensures that:
-/// - Multiple operations execute atomically (Requirement 8.1)
-/// - Failed operations trigger complete rollback (Requirement 8.2)
-/// - Committed changes are durably persisted (Requirement 8.3)
-/// - Long-running transactions are aborted on timeout (Requirement 8.5)
 pub struct Transaction<'a> {
     inner: Option<SqlxTransaction<'a, Postgres>>,
     timeout_duration: Duration,
@@ -25,24 +12,19 @@ pub struct Transaction<'a> {
 impl<'a> Transaction<'a> {
     /// Create a new transaction from a sqlx transaction
     fn new(tx: SqlxTransaction<'a, Postgres>, timeout_duration: Duration) -> Self {
-        Self {
-            inner: Some(tx),
-            timeout_duration,
-        }
+        Self { inner: Some(tx), timeout_duration }
     }
 
     /// Get a mutable reference to the inner transaction
     ///
     /// This allows executing queries within the transaction context
     pub fn inner_mut(&mut self) -> Result<&mut SqlxTransaction<'a, Postgres>> {
-        self.inner.as_mut().ok_or_else(|| {
-            GeoragError::Serialization("Transaction already completed".to_string())
-        })
+        self.inner
+            .as_mut()
+            .ok_or_else(|| GeoragError::Serialization("Transaction already completed".to_string()))
     }
 
     /// Commit the transaction, making all changes permanent
-    ///
-    /// This ensures all changes are durably persisted (Requirement 8.3)
     pub async fn commit(mut self) -> Result<()> {
         let tx = self.inner.take().ok_or_else(|| {
             GeoragError::Serialization("Transaction already completed".to_string())
@@ -50,13 +32,12 @@ impl<'a> Transaction<'a> {
 
         // Apply timeout to commit operation
         let commit_result = timeout(self.timeout_duration, tx.commit()).await;
-        
+
         match commit_result {
             Ok(Ok(())) => Ok(()),
-            Ok(Err(e)) => Err(GeoragError::Serialization(format!(
-                "Failed to commit transaction: {}",
-                e
-            ))),
+            Ok(Err(e)) => {
+                Err(GeoragError::Serialization(format!("Failed to commit transaction: {}", e)))
+            }
             Err(_) => Err(GeoragError::Serialization(format!(
                 "Transaction commit timeout after {}s",
                 self.timeout_duration.as_secs()
@@ -65,8 +46,6 @@ impl<'a> Transaction<'a> {
     }
 
     /// Rollback the transaction, discarding all changes
-    ///
-    /// This ensures failed operations don't persist (Requirement 8.2)
     pub async fn rollback(mut self) -> Result<()> {
         let tx = self.inner.take().ok_or_else(|| {
             GeoragError::Serialization("Transaction already completed".to_string())
@@ -74,13 +53,12 @@ impl<'a> Transaction<'a> {
 
         // Apply timeout to rollback operation
         let rollback_result = timeout(self.timeout_duration, tx.rollback()).await;
-        
+
         match rollback_result {
             Ok(Ok(())) => Ok(()),
-            Ok(Err(e)) => Err(GeoragError::Serialization(format!(
-                "Failed to rollback transaction: {}",
-                e
-            ))),
+            Ok(Err(e)) => {
+                Err(GeoragError::Serialization(format!("Failed to rollback transaction: {}", e)))
+            }
             Err(_) => Err(GeoragError::Serialization(format!(
                 "Transaction rollback timeout after {}s",
                 self.timeout_duration.as_secs()
@@ -112,24 +90,15 @@ pub struct TransactionManager {
 impl TransactionManager {
     /// Create a new transaction manager
     pub fn new(pool: PgPool, default_timeout: Duration) -> Self {
-        Self {
-            pool,
-            default_timeout,
-        }
+        Self { pool, default_timeout }
     }
 
     /// Begin a new transaction with the default timeout
-    ///
-    /// Returns a Transaction handle that can be used to execute operations
-    /// atomically (Requirement 8.1)
     pub async fn begin_transaction(&self) -> Result<Transaction<'_>> {
         self.begin_transaction_with_timeout(self.default_timeout).await
     }
 
     /// Begin a new transaction with a custom timeout
-    ///
-    /// The timeout applies to both the transaction operations and the final
-    /// commit/rollback (Requirement 8.5)
     pub async fn begin_transaction_with_timeout(
         &self,
         timeout_duration: Duration,
@@ -152,7 +121,4 @@ mod tests {
         let manager = TransactionManager::new(pool, Duration::from_secs(30));
         assert_eq!(manager.default_timeout, Duration::from_secs(30));
     }
-
-    // Note: Actual transaction behavior is tested in integration tests
-    // since it requires a real database connection
 }

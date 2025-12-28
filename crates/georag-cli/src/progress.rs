@@ -1,6 +1,6 @@
-//! Progress indicator utilities
+#![allow(dead_code)]
 
-use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::time::Duration;
 
 /// Create a spinner for indeterminate progress
@@ -58,7 +58,7 @@ pub struct BuildProgress {
 impl BuildProgress {
     pub fn new() -> Self {
         let multi = create_multi_progress();
-        
+
         let load_datasets = multi.add(create_spinner("Loading datasets..."));
         let normalize = multi.add(create_spinner("Normalizing geometries..."));
         let validate = multi.add(create_spinner("Validating geometries..."));
@@ -92,10 +92,7 @@ impl BuildProgress {
 
     pub fn finish_normalize(&self, count: usize) {
         if count > 0 {
-            finish_success(
-                &self.normalize,
-                &format!("Normalized {} datasets", count),
-            );
+            finish_success(&self.normalize, &format!("Normalized {} datasets", count));
         } else {
             finish_success(&self.normalize, "All datasets already in workspace CRS");
         }
@@ -149,7 +146,7 @@ pub struct MigrationProgress {
 impl MigrationProgress {
     pub fn new() -> Self {
         let multi = create_multi_progress();
-        
+
         let connect = multi.add(create_spinner("Connecting to PostgreSQL..."));
         let migrations = multi.add(create_spinner("Running migrations..."));
         let datasets = multi.add(create_spinner("Migrating datasets..."));

@@ -1,12 +1,8 @@
-//! SpatialStore implementation for PostgreSQL
-
 use async_trait::async_trait;
-use georag_core::error::{Result, GeoragError};
-use georag_core::models::{
-    Dataset, DatasetId, DatasetMeta, Feature, FeatureId, SpatialFilter,
-};
+use georag_core::error::{GeoragError, Result};
 use georag_core::models::dataset::GeometryType;
 use georag_core::models::query::SpatialPredicate;
+use georag_core::models::{Dataset, DatasetId, DatasetMeta, Feature, FeatureId, SpatialFilter};
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -19,14 +15,14 @@ impl SpatialStore for PostgresStore {
         // For now, we'll use a default workspace_id
         // In a full implementation, this would come from the dataset or context
         let workspace_id = Uuid::new_v4();
-        
+
         // First, ensure workspace exists (create a default one if needed)
         sqlx::query(
             r#"
             INSERT INTO workspaces (id, name, crs, distance_unit, geometry_validity)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (name) DO NOTHING
-            "#
+            "#,
         )
         .bind(workspace_id)
         .bind("default")
@@ -38,17 +34,15 @@ impl SpatialStore for PostgresStore {
         .map_err(|e| GeoragError::Serialization(format!("Failed to create workspace: {}", e)))?;
 
         // Get the workspace_id (either the one we just created or existing)
-        let workspace_id: Uuid = sqlx::query_scalar(
-            "SELECT id FROM workspaces WHERE name = $1"
-        )
-        .bind("default")
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| GeoragError::Serialization(format!("Failed to get workspace: {}", e)))?;
+        let workspace_id: Uuid = sqlx::query_scalar("SELECT id FROM workspaces WHERE name = $1")
+            .bind("default")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| GeoragError::Serialization(format!("Failed to get workspace: {}", e)))?;
 
         // Convert DatasetId to UUID
         let dataset_uuid = Uuid::from_u128(dataset.id.0 as u128);
-        
+
         // Convert geometry type to string
         let geometry_type_str = match dataset.geometry_type {
             GeometryType::Point => "Point",
@@ -98,7 +92,7 @@ impl SpatialStore for PostgresStore {
             SELECT id, name, source_path, crs, geometry_type, feature_count, created_at
             FROM datasets
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(dataset_uuid)
         .fetch_optional(&self.pool)
@@ -155,7 +149,7 @@ impl SpatialStore for PostgresStore {
             SELECT id, name, crs, geometry_type, feature_count, created_at
             FROM datasets
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
@@ -216,18 +210,19 @@ impl SpatialStore for PostgresStore {
         }
 
         // Start a transaction for batch insert
-        let mut tx = self.pool.begin().await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to begin transaction: {}", e)))?;
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to begin transaction: {}", e))
+        })?;
 
         // Get or create a default dataset for features
         // In a real implementation, features would be associated with a specific dataset
         // through the API call context or feature metadata
         let dataset_id: Uuid = sqlx::query_scalar(
             r#"
-            SELECT id FROM datasets 
+            SELECT id FROM datasets
             WHERE name = 'default_features'
             LIMIT 1
-            "#
+            "#,
         )
         .fetch_optional(&mut *tx)
         .await
@@ -239,13 +234,14 @@ impl SpatialStore for PostgresStore {
         });
 
         // If we generated a new UUID, we need to create the dataset
-        let dataset_exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM datasets WHERE id = $1)"
-        )
-        .bind(dataset_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| GeoragError::Serialization(format!("Failed to check dataset existence: {}", e)))?;
+        let dataset_exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM datasets WHERE id = $1)")
+                .bind(dataset_id)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| {
+                    GeoragError::Serialization(format!("Failed to check dataset existence: {}", e))
+                })?;
 
         if !dataset_exists {
             // Get or create default workspace
@@ -255,11 +251,13 @@ impl SpatialStore for PostgresStore {
                 VALUES ('default', 'EPSG:4326', 'Meters', 'Lenient')
                 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
                 RETURNING id
-                "#
+                "#,
             )
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to create workspace: {}", e)))?;
+            .map_err(|e| {
+                GeoragError::Serialization(format!("Failed to create workspace: {}", e))
+            })?;
 
             // Create default dataset
             sqlx::query(
@@ -279,12 +277,14 @@ impl SpatialStore for PostgresStore {
             let feature_uuid = Uuid::from_u128(feature.id.0 as u128);
 
             // Convert geometry to GeoJSON string
-            let geometry_json = serde_json::to_string(&feature.geometry)
-                .map_err(|e| GeoragError::Serialization(format!("Failed to serialize geometry: {}", e)))?;
+            let geometry_json = serde_json::to_string(&feature.geometry).map_err(|e| {
+                GeoragError::Serialization(format!("Failed to serialize geometry: {}", e))
+            })?;
 
             // Convert properties to JSONB
-            let properties_json = serde_json::to_value(&feature.properties)
-                .map_err(|e| GeoragError::Serialization(format!("Failed to serialize properties: {}", e)))?;
+            let properties_json = serde_json::to_value(&feature.properties).map_err(|e| {
+                GeoragError::Serialization(format!("Failed to serialize properties: {}", e))
+            })?;
 
             sqlx::query(
                 r#"
@@ -293,7 +293,7 @@ impl SpatialStore for PostgresStore {
                 ON CONFLICT (dataset_id, feature_id) DO UPDATE
                 SET geometry = EXCLUDED.geometry,
                     properties = EXCLUDED.properties
-                "#
+                "#,
             )
             .bind(feature_uuid)
             .bind(dataset_id)
@@ -305,8 +305,9 @@ impl SpatialStore for PostgresStore {
             .map_err(|e| GeoragError::Serialization(format!("Failed to store feature: {}", e)))?;
         }
 
-        tx.commit().await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to commit transaction: {}", e)))?;
+        tx.commit().await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to commit transaction: {}", e))
+        })?;
 
         Ok(())
     }
@@ -323,29 +324,27 @@ impl SpatialStore for PostgresStore {
             SpatialPredicate::Contains => {
                 ("ST_Contains(geometry, ST_GeomFromGeoJSON($1))", true, false)
             }
-            SpatialPredicate::BoundingBox => {
-                ("geometry && ST_GeomFromGeoJSON($1)", true, false)
-            }
+            SpatialPredicate::BoundingBox => ("geometry && ST_GeomFromGeoJSON($1)", true, false),
         };
 
         // Check if we have the required parameters
         if needs_geometry && filter.geometry.is_none() {
             return Err(GeoragError::Serialization(
-                "Spatial query requires geometry parameter".to_string()
+                "Spatial query requires geometry parameter".to_string(),
             ));
         }
 
         // For distance queries, we need both geometry and distance
-        if needs_distance {
-            if filter.geometry.is_none() || filter.distance.is_none() {
-                return Err(GeoragError::Serialization(
-                    "Distance query requires both geometry and distance parameters".to_string()
-                ));
-            }
+        if needs_distance && (filter.geometry.is_none() || filter.distance.is_none()) {
+            return Err(GeoragError::Serialization(
+                "Distance query requires both geometry and distance parameters".to_string(),
+            ));
         }
 
-        let geometry_json = serde_json::to_string(filter.geometry.as_ref().unwrap())
-            .map_err(|e| GeoragError::Serialization(format!("Failed to serialize geometry: {}", e)))?;
+        let geometry_json =
+            serde_json::to_string(filter.geometry.as_ref().unwrap()).map_err(|e| {
+                GeoragError::Serialization(format!("Failed to serialize geometry: {}", e))
+            })?;
 
         let query_str = format!(
             r#"
@@ -360,7 +359,9 @@ impl SpatialStore for PostgresStore {
             .bind(geometry_json)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to execute spatial query: {}", e)))?;
+            .map_err(|e| {
+                GeoragError::Serialization(format!("Failed to execute spatial query: {}", e))
+            })?;
 
         let features = rows
             .into_iter()
@@ -369,16 +370,13 @@ impl SpatialStore for PostgresStore {
                 let id = FeatureId(uuid.as_u128() as u64);
 
                 let geometry_str: String = row.get("geometry");
-                let geometry: serde_json::Value = serde_json::from_str(&geometry_str)
-                    .unwrap_or(serde_json::json!({}));
+                let geometry: serde_json::Value =
+                    serde_json::from_str(&geometry_str).unwrap_or(serde_json::json!({}));
 
                 let properties: serde_json::Value = row.get("properties");
-                let properties_map = properties.as_object()
-                    .map(|obj| {
-                        obj.iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect()
-                    })
+                let properties_map = properties
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                     .unwrap_or_default();
 
                 Feature {
@@ -401,7 +399,7 @@ impl SpatialStore for PostgresStore {
             SELECT id, feature_id, ST_AsGeoJSON(geometry) as geometry, properties
             FROM features
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(feature_uuid)
         .fetch_optional(&self.pool)
@@ -411,16 +409,15 @@ impl SpatialStore for PostgresStore {
         match row {
             Some(row) => {
                 let geometry_str: String = row.get("geometry");
-                let geometry: serde_json::Value = serde_json::from_str(&geometry_str)
-                    .map_err(|e| GeoragError::Serialization(format!("Failed to parse geometry: {}", e)))?;
+                let geometry: serde_json::Value =
+                    serde_json::from_str(&geometry_str).map_err(|e| {
+                        GeoragError::Serialization(format!("Failed to parse geometry: {}", e))
+                    })?;
 
                 let properties: serde_json::Value = row.get("properties");
-                let properties_map = properties.as_object()
-                    .map(|obj| {
-                        obj.iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect()
-                    })
+                let properties_map = properties
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                     .unwrap_or_default();
 
                 Ok(Some(Feature {

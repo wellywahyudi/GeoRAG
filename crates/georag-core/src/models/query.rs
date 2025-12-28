@@ -1,5 +1,3 @@
-//! Query and result models
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -14,14 +12,14 @@ pub struct FeatureId(pub u64);
 pub struct Feature {
     /// Unique identifier
     pub id: FeatureId,
-    
+
     /// Geometry (stored as GeoJSON-like structure)
     /// None for documents without inherent spatial location
     pub geometry: Option<serde_json::Value>,
-    
+
     /// Feature properties
     pub properties: HashMap<String, serde_json::Value>,
-    
+
     /// CRS EPSG code
     pub crs: u32,
 }
@@ -48,12 +46,7 @@ impl Feature {
         properties: HashMap<String, serde_json::Value>,
         crs: u32,
     ) -> Self {
-        Self {
-            id,
-            geometry: None,
-            properties,
-            crs,
-        }
+        Self { id, geometry: None, properties, crs }
     }
 
     /// Associate a geometry with this feature
@@ -82,13 +75,13 @@ impl Feature {
 pub struct SpatialFilter {
     /// Spatial predicate
     pub predicate: SpatialPredicate,
-    
+
     /// Filter geometry (GeoJSON-like)
     pub geometry: Option<serde_json::Value>,
-    
+
     /// Distance for proximity queries
     pub distance: Option<Distance>,
-    
+
     /// CRS EPSG code
     pub crs: u32,
 }
@@ -107,7 +100,7 @@ pub enum SpatialPredicate {
 pub struct Distance {
     /// Distance value
     pub value: f64,
-    
+
     /// Distance unit
     pub unit: DistanceUnit,
 }
@@ -126,10 +119,10 @@ pub enum DistanceUnit {
 pub struct ScoredResult {
     /// Chunk ID
     pub chunk_id: ChunkId,
-    
+
     /// Similarity score
     pub score: f32,
-    
+
     /// Optional spatial score
     pub spatial_score: Option<f32>,
 }

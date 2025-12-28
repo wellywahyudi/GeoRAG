@@ -1,5 +1,3 @@
-//! Document and chunk models
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -14,16 +12,16 @@ pub struct ChunkId(pub u64);
 pub struct TextChunk {
     /// Unique identifier
     pub id: ChunkId,
-    
+
     /// Text content
     pub content: String,
-    
+
     /// Source information
     pub source: ChunkSource,
-    
+
     /// Optional spatial reference
     pub spatial_ref: Option<FeatureId>,
-    
+
     /// Additional metadata
     pub metadata: ChunkMetadata,
 }
@@ -33,10 +31,10 @@ pub struct TextChunk {
 pub struct ChunkSource {
     /// Source document path
     pub document_path: String,
-    
+
     /// Page number (for PDFs)
     pub page: Option<usize>,
-    
+
     /// Character offset in source
     pub offset: usize,
 }
@@ -46,7 +44,7 @@ pub struct ChunkSource {
 pub struct ChunkMetadata {
     /// Chunk size in characters
     pub size: usize,
-    
+
     /// Additional properties
     pub properties: HashMap<String, String>,
 }
@@ -56,10 +54,10 @@ pub struct ChunkMetadata {
 pub struct Embedding {
     /// Associated chunk ID
     pub chunk_id: ChunkId,
-    
+
     /// Embedding vector
     pub vector: Vec<f32>,
-    
+
     /// Optional spatial metadata
     pub spatial_metadata: Option<SpatialMetadata>,
 }
@@ -69,10 +67,10 @@ pub struct Embedding {
 pub struct SpatialMetadata {
     /// Associated feature ID
     pub feature_id: FeatureId,
-    
+
     /// CRS EPSG code
     pub crs: u32,
-    
+
     /// Bounding box [min_x, min_y, max_x, max_y]
     pub bbox: Option<[f64; 4]>,
 }

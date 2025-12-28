@@ -1,12 +1,7 @@
-//! Output formatting utilities
-
 use console::style;
 use serde::Serialize;
 use std::fmt::Display;
-use tabled::{
-    settings::Style,
-    Table, Tabled,
-};
+use tabled::{settings::Style, Table, Tabled};
 
 /// Output format mode
 #[derive(Debug, Clone, Copy)]
@@ -15,13 +10,11 @@ pub enum OutputFormat {
     Json,
 }
 
-/// Output writer that handles both human-readable and JSON output
 pub struct OutputWriter {
     format: OutputFormat,
 }
 
 impl OutputWriter {
-    /// Create a new output writer
     pub fn new(json: bool) -> Self {
         Self {
             format: if json {
@@ -32,7 +25,6 @@ impl OutputWriter {
         }
     }
 
-    /// Write a success message
     pub fn success(&self, message: impl Display) {
         match self.format {
             OutputFormat::Human => {
@@ -48,7 +40,6 @@ impl OutputWriter {
         }
     }
 
-    /// Write an info message
     pub fn info(&self, message: impl Display) {
         match self.format {
             OutputFormat::Human => {
@@ -64,7 +55,6 @@ impl OutputWriter {
         }
     }
 
-    /// Write a warning message
     pub fn warning(&self, message: impl Display) {
         match self.format {
             OutputFormat::Human => {
@@ -79,8 +69,6 @@ impl OutputWriter {
             }
         }
     }
-
-    /// Write an error message
     pub fn error(&self, message: impl Display) {
         match self.format {
             OutputFormat::Human => {
@@ -96,7 +84,6 @@ impl OutputWriter {
         }
     }
 
-    /// Write a table
     pub fn table<T: Tabled>(&self, data: Vec<T>) {
         match self.format {
             OutputFormat::Human => {
@@ -109,28 +96,26 @@ impl OutputWriter {
                 }
             }
             OutputFormat::Json => {
-                // For JSON, we need to serialize the data
-                // This is a simplified version - in practice you'd want to convert T to a serializable format
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                    "data": "table data"
-                })).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "data": "table data"
+                    }))
+                    .unwrap()
+                );
             }
         }
     }
 
-    /// Write structured data as JSON or formatted output
     pub fn data<T: Serialize>(&self, data: &T) -> anyhow::Result<()> {
         let json_str = serde_json::to_string_pretty(data)?;
         println!("{}", json_str);
         Ok(())
     }
-    
-    /// Write a complete command result with structured data
+
     pub fn result<T: Serialize>(&self, data: T) -> anyhow::Result<()> {
         match self.format {
             OutputFormat::Human => {
-                // For human output, the caller should handle formatting
-                // This method is primarily for JSON output
                 self.data(&data)?;
             }
             OutputFormat::Json => {
@@ -144,7 +129,6 @@ impl OutputWriter {
         Ok(())
     }
 
-    /// Write a key-value pair
     pub fn kv(&self, key: impl Display, value: impl Display) {
         match self.format {
             OutputFormat::Human => {
@@ -159,19 +143,15 @@ impl OutputWriter {
         }
     }
 
-    /// Write a section header
     pub fn section(&self, title: impl Display) {
         match self.format {
             OutputFormat::Human => {
                 println!("\n{}", style(title).bold().underlined());
             }
-            OutputFormat::Json => {
-                // JSON doesn't need section headers
-            }
+            OutputFormat::Json => {}
         }
     }
 
-    /// Check if output is in JSON format
     pub fn is_json(&self) -> bool {
         matches!(self.format, OutputFormat::Json)
     }

@@ -1,13 +1,11 @@
-//! Command implementations
-
-mod init;
 mod add;
 mod build;
-mod query;
-mod status;
-mod migrate;
 mod db;
 mod doctor;
+mod init;
+mod migrate;
+mod query;
+mod status;
 
 use crate::cli::{Cli, Commands};
 use crate::output::OutputWriter;

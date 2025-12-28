@@ -1,4 +1,4 @@
-//! Better error messages with context and suggestions
+#![allow(dead_code)]
 
 use console::style;
 use std::fmt;
@@ -175,10 +175,7 @@ pub fn invalid_config(key: &str, reason: &str) -> CliError {
 /// Create error for embedder not available
 pub fn embedder_not_available(embedder: &str) -> CliError {
     CliError::new("Embedder not available")
-        .with_context(format!(
-            "The specified embedder is not available.\n\nEmbedder: {}",
-            embedder
-        ))
+        .with_context(format!("The specified embedder is not available.\n\nEmbedder: {}", embedder))
         .with_suggestion("Check if Ollama is running: ollama list")
         .with_suggestion("Pull the model: ollama pull nomic-embed-text")
         .with_suggestion("Or use a different embedder: --embedder ollama:other-model")
@@ -188,7 +185,7 @@ pub fn embedder_not_available(embedder: &str) -> CliError {
 /// Convert anyhow::Error to CliError with context
 pub fn from_anyhow(error: anyhow::Error) -> CliError {
     let message = error.to_string();
-    
+
     // Try to provide context based on error message
     if message.contains("No such file or directory") {
         CliError::new("File not found")

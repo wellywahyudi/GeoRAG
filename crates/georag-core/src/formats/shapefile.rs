@@ -1,9 +1,3 @@
-//! Shapefile format reader implementation
-//!
-//! This module provides support for reading ESRI Shapefiles using pure Rust.
-//! Shapefiles consist of multiple component files (.shp, .shx, .dbf, .prj)
-//! that must all be present for proper reading.
-
 use async_trait::async_trait;
 use shapefile::dbase::FieldValue as DbaseFieldValue;
 use shapefile::{Reader as ShapefileReader, Shape};
@@ -14,8 +8,10 @@ use std::path::Path;
 use std::str::FromStr;
 
 use crate::error::{GeoragError, Result};
-use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
 use crate::formats::validation::FormatValidator;
+use crate::formats::{
+    FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation,
+};
 
 /// Shapefile format reader
 pub struct ShapefileFormatReader;
@@ -27,8 +23,8 @@ impl FormatReader for ShapefileFormatReader {
         self.verify_components(path)?;
 
         // Open the Shapefile
-        let mut reader = ShapefileReader::from_path(path)
-            .map_err(|e| GeoragError::FormatError {
+        let mut reader =
+            ShapefileReader::from_path(path).map_err(|e| GeoragError::FormatError {
                 format: "Shapefile".to_string(),
                 message: format!("Failed to open Shapefile: {}", e),
             })?;
@@ -40,11 +36,7 @@ impl FormatReader for ShapefileFormatReader {
         let features = self.read_features(&mut reader)?;
 
         // Get dataset name from filename
-        let name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unnamed")
-            .to_string();
+        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed").to_string();
 
         Ok(FormatDataset {
             name,
@@ -87,11 +79,8 @@ impl FormatReader for ShapefileFormatReader {
         };
 
         // Validate component files using centralized validator
-        let component_validation = FormatValidator::validate_component_files(
-            &base,
-            &["shp", "shx", "dbf"],
-            &["prj"],
-        );
+        let component_validation =
+            FormatValidator::validate_component_files(&base, &["shp", "shx", "dbf"], &["prj"]);
 
         // Merge validations
         Ok(FormatValidator::merge_validations(vec![validation, component_validation]))
@@ -107,7 +96,7 @@ impl ShapefileFormatReader {
                 reason: "Not a Shapefile (.shp)".to_string(),
             });
         }
-        
+
         Ok(path.with_extension(""))
     }
 
@@ -124,21 +113,21 @@ impl ShapefileFormatReader {
         let base = self.get_shapefile_base(path)?;
         let required_extensions = vec!["shp", "shx", "dbf"];
         let mut missing = Vec::new();
-        
+
         for ext in required_extensions {
             let component_path = base.with_extension(ext);
             if !component_path.exists() {
                 missing.push(format!(".{}", ext));
             }
         }
-        
+
         if !missing.is_empty() {
             return Err(GeoragError::FormatError {
                 format: "Shapefile".to_string(),
                 message: format!("Missing required component files: {}", missing.join(", ")),
             });
         }
-        
+
         Ok(())
     }
 
@@ -148,16 +137,20 @@ impl ShapefileFormatReader {
         let prj_path = base.with_extension("prj");
 
         if !prj_path.exists() {
-            // No .prj file, default to EPSG:4326
+            // No .prj file, default to EPSG:4326 with warning
+            tracing::warn!(
+                "Shapefile {} has no .prj file, defaulting to EPSG:4326 (WGS84). \
+                 CRS may be incorrect.",
+                path.display()
+            );
             return Ok(4326);
         }
 
         // Read .prj file content
-        let prj_content = fs::read_to_string(&prj_path)
-            .map_err(|e| GeoragError::FormatError {
-                format: "Shapefile".to_string(),
-                message: format!("Failed to read .prj file: {}", e),
-            })?;
+        let prj_content = fs::read_to_string(&prj_path).map_err(|e| GeoragError::FormatError {
+            format: "Shapefile".to_string(),
+            message: format!("Failed to read .prj file: {}", e),
+        })?;
 
         // Try to parse WKT and extract EPSG code
         if let Some(epsg) = self.parse_epsg_from_wkt(&prj_content) {
@@ -178,7 +171,12 @@ impl ShapefileFormatReader {
             }
         }
 
-        // Could not extract EPSG code, default to 4326
+        // Could not extract EPSG code, default to 4326 with warning
+        tracing::warn!(
+            "Shapefile {} has .prj file but could not extract EPSG code, \
+             defaulting to EPSG:4326 (WGS84). CRS may be incorrect.",
+            path.display()
+        );
         Ok(4326)
     }
 
@@ -197,10 +195,8 @@ impl ShapefileFormatReader {
         // Look for EPSG: prefix
         if let Some(start) = wkt.find("EPSG:") {
             let code_start = start + 5;
-            let code_str: String = wkt[code_start..]
-                .chars()
-                .take_while(|c| c.is_ascii_digit())
-                .collect();
+            let code_str: String =
+                wkt[code_start..].chars().take_while(|c| c.is_ascii_digit()).collect();
             if let Ok(code) = code_str.parse::<u32>() {
                 return Some(code);
             }
@@ -233,7 +229,10 @@ impl ShapefileFormatReader {
     }
 
     /// Read features from the Shapefile
-    fn read_features(&self, reader: &mut shapefile::Reader<BufReader<fs::File>, BufReader<fs::File>>) -> Result<Vec<FormatFeature>> {
+    fn read_features(
+        &self,
+        reader: &mut shapefile::Reader<BufReader<fs::File>, BufReader<fs::File>>,
+    ) -> Result<Vec<FormatFeature>> {
         let mut features = Vec::new();
 
         // Iterate through all shapes and records
@@ -252,11 +251,7 @@ impl ShapefileFormatReader {
             // Generate feature ID from record number
             let id = features.len().to_string();
 
-            features.push(FormatFeature {
-                id,
-                geometry: Some(geometry),
-                properties,
-            });
+            features.push(FormatFeature { id, geometry: Some(geometry), properties });
         }
 
         Ok(features)
@@ -265,33 +260,23 @@ impl ShapefileFormatReader {
     /// Convert shapefile Shape to GeoJSON Value
     fn convert_shape_to_geojson(&self, shape: &Shape) -> Result<serde_json::Value> {
         match shape {
-            Shape::Point(point) => {
-                Ok(serde_json::json!({
-                    "type": "Point",
-                    "coordinates": [point.x, point.y]
-                }))
-            }
-            Shape::PointZ(point) => {
-                Ok(serde_json::json!({
-                    "type": "Point",
-                    "coordinates": [point.x, point.y, point.z]
-                }))
-            }
-            Shape::PointM(point) => {
-                Ok(serde_json::json!({
-                    "type": "Point",
-                    "coordinates": [point.x, point.y]
-                }))
-            }
+            Shape::Point(point) => Ok(serde_json::json!({
+                "type": "Point",
+                "coordinates": [point.x, point.y]
+            })),
+            Shape::PointZ(point) => Ok(serde_json::json!({
+                "type": "Point",
+                "coordinates": [point.x, point.y, point.z]
+            })),
+            Shape::PointM(point) => Ok(serde_json::json!({
+                "type": "Point",
+                "coordinates": [point.x, point.y]
+            })),
             Shape::Polyline(polyline) => {
                 let coordinates: Vec<Vec<[f64; 2]>> = polyline
                     .parts()
-                    .into_iter()
-                    .map(|part| {
-                        part.iter()
-                            .map(|p| [p.x, p.y])
-                            .collect()
-                    })
+                    .iter()
+                    .map(|part| part.iter().map(|p| [p.x, p.y]).collect())
                     .collect();
 
                 if coordinates.len() == 1 {
@@ -309,12 +294,8 @@ impl ShapefileFormatReader {
             Shape::PolylineZ(polyline) => {
                 let coordinates: Vec<Vec<[f64; 3]>> = polyline
                     .parts()
-                    .into_iter()
-                    .map(|part| {
-                        part.iter()
-                            .map(|p| [p.x, p.y, p.z])
-                            .collect()
-                    })
+                    .iter()
+                    .map(|part| part.iter().map(|p| [p.x, p.y, p.z]).collect())
                     .collect();
 
                 if coordinates.len() == 1 {
@@ -332,12 +313,8 @@ impl ShapefileFormatReader {
             Shape::PolylineM(polyline) => {
                 let coordinates: Vec<Vec<[f64; 2]>> = polyline
                     .parts()
-                    .into_iter()
-                    .map(|part| {
-                        part.iter()
-                            .map(|p| [p.x, p.y])
-                            .collect()
-                    })
+                    .iter()
+                    .map(|part| part.iter().map(|p| [p.x, p.y]).collect())
                     .collect();
 
                 if coordinates.len() == 1 {
@@ -355,13 +332,8 @@ impl ShapefileFormatReader {
             Shape::Polygon(polygon) => {
                 let rings: Vec<Vec<[f64; 2]>> = polygon
                     .rings()
-                    .into_iter()
-                    .map(|ring| {
-                        ring.points()
-                            .iter()
-                            .map(|p| [p.x, p.y])
-                            .collect()
-                    })
+                    .iter()
+                    .map(|ring| ring.points().iter().map(|p| [p.x, p.y]).collect())
                     .collect();
 
                 Ok(serde_json::json!({
@@ -372,13 +344,8 @@ impl ShapefileFormatReader {
             Shape::PolygonZ(polygon) => {
                 let rings: Vec<Vec<[f64; 3]>> = polygon
                     .rings()
-                    .into_iter()
-                    .map(|ring| {
-                        ring.points()
-                            .iter()
-                            .map(|p| [p.x, p.y, p.z])
-                            .collect()
-                    })
+                    .iter()
+                    .map(|ring| ring.points().iter().map(|p| [p.x, p.y, p.z]).collect())
                     .collect();
 
                 Ok(serde_json::json!({
@@ -389,13 +356,8 @@ impl ShapefileFormatReader {
             Shape::PolygonM(polygon) => {
                 let rings: Vec<Vec<[f64; 2]>> = polygon
                     .rings()
-                    .into_iter()
-                    .map(|ring| {
-                        ring.points()
-                            .iter()
-                            .map(|p| [p.x, p.y])
-                            .collect()
-                    })
+                    .iter()
+                    .map(|ring| ring.points().iter().map(|p| [p.x, p.y]).collect())
                     .collect();
 
                 Ok(serde_json::json!({
@@ -404,11 +366,8 @@ impl ShapefileFormatReader {
                 }))
             }
             Shape::Multipoint(multipoint) => {
-                let coordinates: Vec<[f64; 2]> = multipoint
-                    .points()
-                    .iter()
-                    .map(|p| [p.x, p.y])
-                    .collect();
+                let coordinates: Vec<[f64; 2]> =
+                    multipoint.points().iter().map(|p| [p.x, p.y]).collect();
 
                 Ok(serde_json::json!({
                     "type": "MultiPoint",
@@ -416,11 +375,8 @@ impl ShapefileFormatReader {
                 }))
             }
             Shape::MultipointZ(multipoint) => {
-                let coordinates: Vec<[f64; 3]> = multipoint
-                    .points()
-                    .iter()
-                    .map(|p| [p.x, p.y, p.z])
-                    .collect();
+                let coordinates: Vec<[f64; 3]> =
+                    multipoint.points().iter().map(|p| [p.x, p.y, p.z]).collect();
 
                 Ok(serde_json::json!({
                     "type": "MultiPoint",
@@ -428,11 +384,8 @@ impl ShapefileFormatReader {
                 }))
             }
             Shape::MultipointM(multipoint) => {
-                let coordinates: Vec<[f64; 2]> = multipoint
-                    .points()
-                    .iter()
-                    .map(|p| [p.x, p.y])
-                    .collect();
+                let coordinates: Vec<[f64; 2]> =
+                    multipoint.points().iter().map(|p| [p.x, p.y]).collect();
 
                 Ok(serde_json::json!({
                     "type": "MultiPoint",
@@ -474,46 +427,36 @@ impl ShapefileFormatReader {
         match value {
             DbaseFieldValue::Character(Some(s)) => serde_json::Value::String(s.clone()),
             DbaseFieldValue::Character(None) => serde_json::Value::Null,
-            DbaseFieldValue::Numeric(Some(n)) => {
-                serde_json::Number::from_f64(*n)
-                    .map(serde_json::Value::Number)
-                    .unwrap_or(serde_json::Value::Null)
-            }
+            DbaseFieldValue::Numeric(Some(n)) => serde_json::Number::from_f64(*n)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null),
             DbaseFieldValue::Numeric(None) => serde_json::Value::Null,
             DbaseFieldValue::Logical(Some(b)) => serde_json::Value::Bool(*b),
             DbaseFieldValue::Logical(None) => serde_json::Value::Null,
-            DbaseFieldValue::Date(Some(date)) => {
-                serde_json::Value::String(format!("{:04}-{:02}-{:02}", date.year(), date.month(), date.day()))
-            }
+            DbaseFieldValue::Date(Some(date)) => serde_json::Value::String(format!(
+                "{:04}-{:02}-{:02}",
+                date.year(),
+                date.month(),
+                date.day()
+            )),
             DbaseFieldValue::Date(None) => serde_json::Value::Null,
-            DbaseFieldValue::Float(Some(f)) => {
-                serde_json::Number::from_f64(*f as f64)
-                    .map(serde_json::Value::Number)
-                    .unwrap_or(serde_json::Value::Null)
-            }
+            DbaseFieldValue::Float(Some(f)) => serde_json::Number::from_f64(*f as f64)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null),
             DbaseFieldValue::Float(None) => serde_json::Value::Null,
             DbaseFieldValue::Integer(i) => serde_json::Value::Number((*i).into()),
-            DbaseFieldValue::Currency(c) => {
-                serde_json::Number::from_f64(*c)
-                    .map(serde_json::Value::Number)
-                    .unwrap_or(serde_json::Value::Null)
-            }
-            DbaseFieldValue::DateTime(dt) => {
-                // Format as ISO 8601 string
-                // Note: shapefile dbase::Time doesn't have hour/minute/second methods
-                // We'll format just the date part
-                serde_json::Value::String(format!(
-                    "{:04}-{:02}-{:02}",
-                    dt.date().year(),
-                    dt.date().month(),
-                    dt.date().day()
-                ))
-            }
-            DbaseFieldValue::Double(d) => {
-                serde_json::Number::from_f64(*d)
-                    .map(serde_json::Value::Number)
-                    .unwrap_or(serde_json::Value::Null)
-            }
+            DbaseFieldValue::Currency(c) => serde_json::Number::from_f64(*c)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null),
+            DbaseFieldValue::DateTime(dt) => serde_json::Value::String(format!(
+                "{:04}-{:02}-{:02}",
+                dt.date().year(),
+                dt.date().month(),
+                dt.date().day()
+            )),
+            DbaseFieldValue::Double(d) => serde_json::Number::from_f64(*d)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null),
             DbaseFieldValue::Memo(s) => serde_json::Value::String(s.clone()),
         }
     }
@@ -539,9 +482,9 @@ mod tests {
     async fn test_validation_missing_file() {
         let reader = ShapefileFormatReader;
         let path = Path::new("/nonexistent/test.shp");
-        
+
         let validation = reader.validate(path).await.unwrap();
-        
+
         assert!(!validation.is_valid());
         assert!(!validation.errors.is_empty());
     }
@@ -549,11 +492,11 @@ mod tests {
     #[test]
     fn test_parse_epsg_from_wkt() {
         let reader = ShapefileFormatReader;
-        
+
         // Test AUTHORITY pattern
         let wkt1 = r#"GEOGCS["WGS 84",AUTHORITY["EPSG","4326"]]"#;
         assert_eq!(reader.parse_epsg_from_wkt(wkt1), Some(4326));
-        
+
         // Test EPSG: prefix
         let wkt2 = "EPSG:3857";
         assert_eq!(reader.parse_epsg_from_wkt(wkt2), Some(3857));

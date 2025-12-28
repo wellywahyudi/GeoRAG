@@ -1,8 +1,6 @@
-//! DocumentStore implementation for PostgreSQL
-
 use async_trait::async_trait;
-use georag_core::error::{Result, GeoragError};
-use georag_core::models::{ChunkId, TextChunk, FeatureId};
+use georag_core::error::{GeoragError, Result};
+use georag_core::models::{ChunkId, FeatureId, TextChunk};
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -17,32 +15,32 @@ impl DocumentStore for PostgresStore {
         }
 
         // Start a transaction for batch insert
-        let mut tx = self.pool.begin().await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to begin transaction: {}", e)))?;
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to begin transaction: {}", e))
+        })?;
 
         // Get or create a default dataset and document for chunks
-        // In a real implementation, chunks would be associated with a specific document
-        // through the API call context or chunk metadata
         let dataset_id: Uuid = sqlx::query_scalar(
             r#"
-            SELECT id FROM datasets 
+            SELECT id FROM datasets
             WHERE name = 'default_documents'
             LIMIT 1
-            "#
+            "#,
         )
         .fetch_optional(&mut *tx)
         .await
         .map_err(|e| GeoragError::Serialization(format!("Failed to query dataset: {}", e)))?
-        .unwrap_or_else(|| Uuid::new_v4());
+        .unwrap_or_else(Uuid::new_v4);
 
         // If we generated a new UUID, we need to create the dataset
-        let dataset_exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM datasets WHERE id = $1)"
-        )
-        .bind(dataset_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| GeoragError::Serialization(format!("Failed to check dataset existence: {}", e)))?;
+        let dataset_exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM datasets WHERE id = $1)")
+                .bind(dataset_id)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| {
+                    GeoragError::Serialization(format!("Failed to check dataset existence: {}", e))
+                })?;
 
         if !dataset_exists {
             // Get or create default workspace
@@ -52,11 +50,13 @@ impl DocumentStore for PostgresStore {
                 VALUES ('default', 'EPSG:4326', 'Meters', 'Lenient')
                 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
                 RETURNING id
-                "#
+                "#,
             )
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to create workspace: {}", e)))?;
+            .map_err(|e| {
+                GeoragError::Serialization(format!("Failed to create workspace: {}", e))
+            })?;
 
             // Create default dataset
             sqlx::query(
@@ -79,7 +79,7 @@ impl DocumentStore for PostgresStore {
             VALUES ($1, 'default_document', '/tmp/default', 'text')
             ON CONFLICT DO NOTHING
             RETURNING id
-            "#
+            "#,
         )
         .bind(dataset_id)
         .fetch_optional(&mut *tx)
@@ -93,7 +93,7 @@ impl DocumentStore for PostgresStore {
         // If we got a placeholder, fetch the actual document_id
         let document_id: Uuid = if document_id == Uuid::new_v4() {
             sqlx::query_scalar(
-                "SELECT id FROM documents WHERE dataset_id = $1 AND name = 'default_document'"
+                "SELECT id FROM documents WHERE dataset_id = $1 AND name = 'default_document'",
             )
             .bind(dataset_id)
             .fetch_one(&mut *tx)
@@ -108,8 +108,9 @@ impl DocumentStore for PostgresStore {
             let chunk_uuid = Uuid::from_u128(chunk.id.0 as u128);
 
             // Convert metadata to JSONB
-            let metadata_json = serde_json::to_value(&chunk.metadata)
-                .map_err(|e| GeoragError::Serialization(format!("Failed to serialize metadata: {}", e)))?;
+            let metadata_json = serde_json::to_value(&chunk.metadata).map_err(|e| {
+                GeoragError::Serialization(format!("Failed to serialize metadata: {}", e))
+            })?;
 
             // Handle spatial reference
             let spatial_ref_uuid = chunk.spatial_ref.map(|fid| Uuid::from_u128(fid.0 as u128));
@@ -145,8 +146,9 @@ impl DocumentStore for PostgresStore {
             .map_err(|e| GeoragError::Serialization(format!("Failed to store chunk: {}", e)))?;
         }
 
-        tx.commit().await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to commit transaction: {}", e)))?;
+        tx.commit().await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to commit transaction: {}", e))
+        })?;
 
         Ok(())
     }
@@ -157,16 +159,14 @@ impl DocumentStore for PostgresStore {
         }
 
         // Convert ChunkIds to UUIDs
-        let uuids: Vec<Uuid> = ids.iter()
-            .map(|id| Uuid::from_u128(id.0 as u128))
-            .collect();
+        let uuids: Vec<Uuid> = ids.iter().map(|id| Uuid::from_u128(id.0 as u128)).collect();
 
         let rows = sqlx::query(
             r#"
-            SELECT 
-                c.id, 
-                c.content, 
-                c.start_offset, 
+            SELECT
+                c.id,
+                c.content,
+                c.start_offset,
                 c.end_offset,
                 c.spatial_ref,
                 c.metadata,
@@ -174,7 +174,7 @@ impl DocumentStore for PostgresStore {
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE c.id = ANY($1)
-            "#
+            "#,
         )
         .bind(&uuids)
         .fetch_all(&self.pool)
@@ -191,11 +191,12 @@ impl DocumentStore for PostgresStore {
                 let spatial_ref = spatial_ref_uuid.map(|uuid| FeatureId(uuid.as_u128() as u64));
 
                 let metadata_json: serde_json::Value = row.get("metadata");
-                let metadata = serde_json::from_value(metadata_json)
-                    .unwrap_or_else(|_| georag_core::models::document::ChunkMetadata {
+                let metadata = serde_json::from_value(metadata_json).unwrap_or_else(|_| {
+                    georag_core::models::document::ChunkMetadata {
                         size: 0,
                         properties: std::collections::HashMap::new(),
-                    });
+                    }
+                });
 
                 let document_path: String = row.get("source_path");
                 let start_offset: i32 = row.get("start_offset");
@@ -228,9 +229,7 @@ impl DocumentStore for PostgresStore {
         }
 
         // Convert ChunkIds to UUIDs
-        let uuids: Vec<Uuid> = ids.iter()
-            .map(|id| Uuid::from_u128(id.0 as u128))
-            .collect();
+        let uuids: Vec<Uuid> = ids.iter().map(|id| Uuid::from_u128(id.0 as u128)).collect();
 
         // Delete chunks (CASCADE will handle embeddings)
         sqlx::query("DELETE FROM chunks WHERE id = ANY($1)")

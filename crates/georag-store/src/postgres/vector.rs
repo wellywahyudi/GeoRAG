@@ -1,7 +1,5 @@
-//! VectorStore implementation for PostgreSQL with pgvector
-
 use async_trait::async_trait;
-use georag_core::error::{Result, GeoragError};
+use georag_core::error::{GeoragError, Result};
 use georag_core::models::{ChunkId, Embedding, ScoredResult};
 use sqlx::Row;
 use uuid::Uuid;
@@ -23,12 +21,12 @@ impl PostgresStore {
             lists
         } else {
             // Auto-calculate: sqrt(row_count) is a common heuristic
-            let row_count: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM embeddings"
-            )
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to count embeddings: {}", e)))?;
+            let row_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM embeddings")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    GeoragError::Serialization(format!("Failed to count embeddings: {}", e))
+                })?;
 
             // Use sqrt(row_count) with min of 10 and max of 1000
             let calculated = (row_count as f64).sqrt() as usize;
@@ -48,10 +46,9 @@ impl PostgresStore {
             )
         };
 
-        sqlx::query(&create_sql)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to create vector index: {}", e)))?;
+        sqlx::query(&create_sql).execute(&self.pool).await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to create vector index: {}", e))
+        })?;
 
         Ok(())
     }
@@ -61,15 +58,17 @@ impl PostgresStore {
         let exists: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS (
-                SELECT 1 FROM pg_indexes 
-                WHERE tablename = 'embeddings' 
+                SELECT 1 FROM pg_indexes
+                WHERE tablename = 'embeddings'
                 AND indexname = 'idx_embeddings_vector'
             )
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| GeoragError::Serialization(format!("Failed to check index existence: {}", e)))?;
+        .map_err(|e| {
+            GeoragError::Serialization(format!("Failed to check index existence: {}", e))
+        })?;
 
         Ok(exists)
     }
@@ -93,29 +92,26 @@ impl VectorStore for PostgresStore {
         if embeddings.is_empty() {
             return Ok(());
         }
-
-        // Start a transaction for atomicity (Requirement 5.2)
-        let mut tx = self.pool.begin().await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to begin transaction: {}", e)))?;
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to begin transaction: {}", e))
+        })?;
 
         for embedding in embeddings {
             let chunk_uuid = Uuid::from_u128(embedding.chunk_id.0 as u128);
             let embedding_uuid = Uuid::new_v4();
-            
+
             // Convert Vec<f32> to pgvector format (as a string representation)
-            let vector_str = format!("[{}]", 
-                embedding.vector.iter()
-                    .map(|v| v.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
+            let vector_str = format!(
+                "[{}]",
+                embedding.vector.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")
             );
-            
+
             let dimensions = embedding.vector.len() as i32;
-            
+
             // Use ON CONFLICT for upsert behavior
             // We'll use a default model name if not specified
             let model_name = "default";
-            
+
             sqlx::query(
                 r#"
                 INSERT INTO embeddings (id, chunk_id, model, dimensions, vector)
@@ -123,7 +119,7 @@ impl VectorStore for PostgresStore {
                 ON CONFLICT (chunk_id, model) DO UPDATE
                 SET vector = EXCLUDED.vector,
                     dimensions = EXCLUDED.dimensions
-                "#
+                "#,
             )
             .bind(embedding_uuid)
             .bind(chunk_uuid)
@@ -136,32 +132,31 @@ impl VectorStore for PostgresStore {
         }
 
         // Commit transaction
-        tx.commit().await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to commit transaction: {}", e)))?;
+        tx.commit().await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to commit transaction: {}", e))
+        })?;
 
         Ok(())
     }
 
-    async fn similarity_search(&self, query: &[f32], k: usize, threshold: Option<f32>) -> Result<Vec<ScoredResult>> {
-        // Check if vector index exists, warn if not (Requirement 6.5)
+    async fn similarity_search(
+        &self,
+        query: &[f32],
+        k: usize,
+        threshold: Option<f32>,
+    ) -> Result<Vec<ScoredResult>> {
         if !self.vector_index_exists().await? {
             eprintln!("Warning: Vector index does not exist. Falling back to exact search. Consider running create_vector_index() for better performance.");
         }
 
         // Convert query vector to pgvector format
-        let query_str = format!("[{}]", 
-            query.iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        );
+        let query_str =
+            format!("[{}]", query.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(","));
 
         // Build query with optional threshold filtering
         let query_sql = if let Some(_threshold) = threshold {
-            // Apply threshold filtering with WHERE clause (Requirement 6.2)
-            format!(
-                r#"
-                SELECT 
+            r#"
+                SELECT
                     e.chunk_id,
                     1 - (e.vector <=> $1::vector) as similarity
                 FROM embeddings e
@@ -169,30 +164,28 @@ impl VectorStore for PostgresStore {
                 ORDER BY e.vector <=> $1::vector
                 LIMIT $2
                 "#
-            )
+            .to_string()
         } else {
             r#"
-            SELECT 
+            SELECT
                 e.chunk_id,
                 1 - (e.vector <=> $1::vector) as similarity
             FROM embeddings e
             ORDER BY e.vector <=> $1::vector
             LIMIT $2
-            "#.to_string()
+            "#
+            .to_string()
         };
 
-        let mut query_builder = sqlx::query(&query_sql)
-            .bind(&query_str)
-            .bind(k as i64);
+        let mut query_builder = sqlx::query(&query_sql).bind(&query_str).bind(k as i64);
 
         if let Some(threshold) = threshold {
             query_builder = query_builder.bind(threshold);
         }
 
-        let rows = query_builder
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to execute similarity search: {}", e)))?;
+        let rows = query_builder.fetch_all(&self.pool).await.map_err(|e| {
+            GeoragError::Serialization(format!("Failed to execute similarity search: {}", e))
+        })?;
 
         let results = rows
             .into_iter()
@@ -221,7 +214,7 @@ impl VectorStore for PostgresStore {
             FROM embeddings
             WHERE chunk_id = $1
             LIMIT 1
-            "#
+            "#,
         )
         .bind(chunk_uuid)
         .fetch_optional(&self.pool)
@@ -231,16 +224,13 @@ impl VectorStore for PostgresStore {
         match row {
             Some(row) => {
                 let vector_text: String = row.get("vector_text");
-                
-                // Parse pgvector format "[1.0,2.0,3.0]" to Vec<f32>
-                let vector = parse_pgvector(&vector_text)
-                    .map_err(|e| GeoragError::Serialization(format!("Failed to parse vector: {}", e)))?;
 
-                Ok(Some(Embedding {
-                    chunk_id,
-                    vector,
-                    spatial_metadata: None,
-                }))
+                // Parse pgvector format "[1.0,2.0,3.0]" to Vec<f32>
+                let vector = parse_pgvector(&vector_text).map_err(|e| {
+                    GeoragError::Serialization(format!("Failed to parse vector: {}", e))
+                })?;
+
+                Ok(Some(Embedding { chunk_id, vector, spatial_metadata: None }))
             }
             None => Ok(None),
         }
@@ -252,29 +242,27 @@ impl VectorStore for PostgresStore {
         }
 
         // Convert ChunkIds to UUIDs
-        let chunk_uuids: Vec<Uuid> = chunk_ids
-            .iter()
-            .map(|id| Uuid::from_u128(id.0 as u128))
-            .collect();
+        let chunk_uuids: Vec<Uuid> =
+            chunk_ids.iter().map(|id| Uuid::from_u128(id.0 as u128)).collect();
 
         // Batch DELETE
         sqlx::query("DELETE FROM embeddings WHERE chunk_id = ANY($1)")
             .bind(&chunk_uuids)
             .execute(&self.pool)
             .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to delete embeddings: {}", e)))?;
+            .map_err(|e| {
+                GeoragError::Serialization(format!("Failed to delete embeddings: {}", e))
+            })?;
 
         Ok(())
     }
 
     async fn dimensions(&self) -> Result<usize> {
         // Get dimensions from the first embedding
-        let row = sqlx::query(
-            "SELECT dimensions FROM embeddings LIMIT 1"
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| GeoragError::Serialization(format!("Failed to get dimensions: {}", e)))?;
+        let row = sqlx::query("SELECT dimensions FROM embeddings LIMIT 1")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| GeoragError::Serialization(format!("Failed to get dimensions: {}", e)))?;
 
         match row {
             Some(row) => {
@@ -289,24 +277,24 @@ impl VectorStore for PostgresStore {
 /// Parse pgvector format string "[1.0,2.0,3.0]" to Vec<f32>
 fn parse_pgvector(s: &str) -> Result<Vec<f32>> {
     let trimmed = s.trim();
-    
+
     if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
-        return Err(GeoragError::Serialization(
-            format!("Invalid pgvector format: {}", s)
-        ));
+        return Err(GeoragError::Serialization(format!("Invalid pgvector format: {}", s)));
     }
-    
-    let inner = &trimmed[1..trimmed.len()-1];
-    
+
+    let inner = &trimmed[1..trimmed.len() - 1];
+
     if inner.is_empty() {
         return Ok(Vec::new());
     }
-    
-    inner.split(',')
-        .map(|s| s.trim().parse::<f32>()
-            .map_err(|e| GeoragError::Serialization(
-                format!("Failed to parse float: {}", e)
-            )))
+
+    inner
+        .split(',')
+        .map(|s| {
+            s.trim()
+                .parse::<f32>()
+                .map_err(|e| GeoragError::Serialization(format!("Failed to parse float: {}", e)))
+        })
         .collect()
 }
 

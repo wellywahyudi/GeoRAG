@@ -30,37 +30,35 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
     // Create projection
     let from_proj = format!("EPSG:{}", from_crs.epsg);
     let to_proj = format!("EPSG:{}", to_crs.epsg);
-    
-    let proj = Proj::new_known_crs(&from_proj, &to_proj, None)
-        .map_err(|e| GeoragError::ConfigInvalid {
+
+    let proj = Proj::new_known_crs(&from_proj, &to_proj, None).map_err(|e| {
+        GeoragError::ConfigInvalid {
             key: "crs".to_string(),
             reason: format!("Failed to create projection from {} to {}: {}", from_proj, to_proj, e),
-        })?;
+        }
+    })?;
 
     // Transform the geometry
     let transformed = match geometry {
         Geometry::Point(p) => {
-            let (x, y) = proj
-                .convert((p.x(), p.y()))
-                .map_err(|e| GeoragError::ConfigInvalid {
-                    key: "crs".to_string(),
-                    reason: format!("Projection failed: {}", e),
-                })?;
+            let (x, y) = proj.convert((p.x(), p.y())).map_err(|e| GeoragError::ConfigInvalid {
+                key: "crs".to_string(),
+                reason: format!("Projection failed: {}", e),
+            })?;
             Geometry::Point(geo::Point::new(x, y))
         }
         Geometry::LineString(ls) => {
-            let coords: Result<Vec<_>> = ls
-                .0
-                .iter()
-                .map(|coord| {
-                    proj.convert((coord.x, coord.y))
-                        .map(|(x, y)| geo::Coord { x, y })
-                        .map_err(|e| GeoragError::ConfigInvalid {
-                            key: "crs".to_string(),
-                            reason: format!("Projection failed: {}", e),
-                        })
-                })
-                .collect();
+            let coords: Result<Vec<_>> =
+                ls.0.iter()
+                    .map(|coord| {
+                        proj.convert((coord.x, coord.y)).map(|(x, y)| geo::Coord { x, y }).map_err(
+                            |e| GeoragError::ConfigInvalid {
+                                key: "crs".to_string(),
+                                reason: format!("Projection failed: {}", e),
+                            },
+                        )
+                    })
+                    .collect();
             Geometry::LineString(geo::LineString::from(coords?))
         }
         Geometry::Polygon(poly) => {
@@ -69,15 +67,15 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
                 .0
                 .iter()
                 .map(|coord| {
-                    proj.convert((coord.x, coord.y))
-                        .map(|(x, y)| geo::Coord { x, y })
-                        .map_err(|e| GeoragError::ConfigInvalid {
+                    proj.convert((coord.x, coord.y)).map(|(x, y)| geo::Coord { x, y }).map_err(
+                        |e| GeoragError::ConfigInvalid {
                             key: "crs".to_string(),
                             reason: format!("Projection failed: {}", e),
-                        })
+                        },
+                    )
                 })
                 .collect();
-            
+
             let interiors: Result<Vec<_>> = poly
                 .interiors()
                 .iter()
@@ -94,28 +92,27 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
                                 })
                         })
                         .collect();
-                    coords.map(|c| geo::LineString::from(c))
+                    coords.map(geo::LineString::from)
                 })
                 .collect();
-            
+
             Geometry::Polygon(geo::Polygon::new(
                 geo::LineString::from(exterior_coords?),
                 interiors?,
             ))
         }
         Geometry::MultiPoint(mp) => {
-            let points: Result<Vec<_>> = mp
-                .0
-                .iter()
-                .map(|p| {
-                    proj.convert((p.x(), p.y()))
-                        .map(|(x, y)| geo::Point::new(x, y))
-                        .map_err(|e| GeoragError::ConfigInvalid {
-                            key: "crs".to_string(),
-                            reason: format!("Projection failed: {}", e),
-                        })
-                })
-                .collect();
+            let points: Result<Vec<_>> =
+                mp.0.iter()
+                    .map(|p| {
+                        proj.convert((p.x(), p.y())).map(|(x, y)| geo::Point::new(x, y)).map_err(
+                            |e| GeoragError::ConfigInvalid {
+                                key: "crs".to_string(),
+                                reason: format!("Projection failed: {}", e),
+                            },
+                        )
+                    })
+                    .collect();
             Geometry::MultiPoint(geo::MultiPoint(points?))
         }
         Geometry::MultiLineString(mls) => {
@@ -123,68 +120,63 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
                 .0
                 .iter()
                 .map(|ls| {
-                    let coords: Result<Vec<_>> = ls
-                        .0
-                        .iter()
-                        .map(|coord| {
-                            proj.convert((coord.x, coord.y))
-                                .map(|(x, y)| geo::Coord { x, y })
-                                .map_err(|e| GeoragError::ConfigInvalid {
-                                    key: "crs".to_string(),
-                                    reason: format!("Projection failed: {}", e),
-                                })
-                        })
-                        .collect();
-                    coords.map(|c| geo::LineString::from(c))
+                    let coords: Result<Vec<_>> =
+                        ls.0.iter()
+                            .map(|coord| {
+                                proj.convert((coord.x, coord.y))
+                                    .map(|(x, y)| geo::Coord { x, y })
+                                    .map_err(|e| GeoragError::ConfigInvalid {
+                                        key: "crs".to_string(),
+                                        reason: format!("Projection failed: {}", e),
+                                    })
+                            })
+                            .collect();
+                    coords.map(geo::LineString::from)
                 })
                 .collect();
             Geometry::MultiLineString(geo::MultiLineString(linestrings?))
         }
         Geometry::MultiPolygon(mp) => {
-            let polygons: Result<Vec<_>> = mp
-                .0
-                .iter()
-                .map(|poly| {
-                    let exterior_coords: Result<Vec<_>> = poly
-                        .exterior()
-                        .0
-                        .iter()
-                        .map(|coord| {
-                            proj.convert((coord.x, coord.y))
-                                .map(|(x, y)| geo::Coord { x, y })
-                                .map_err(|e| GeoragError::ConfigInvalid {
-                                    key: "crs".to_string(),
-                                    reason: format!("Projection failed: {}", e),
-                                })
-                        })
-                        .collect();
-                    
-                    let interiors: Result<Vec<_>> = poly
-                        .interiors()
-                        .iter()
-                        .map(|interior| {
-                            let coords: Result<Vec<_>> = interior
-                                .0
-                                .iter()
-                                .map(|coord| {
-                                    proj.convert((coord.x, coord.y))
-                                        .map(|(x, y)| geo::Coord { x, y })
-                                        .map_err(|e| GeoragError::ConfigInvalid {
-                                            key: "crs".to_string(),
-                                            reason: format!("Projection failed: {}", e),
-                                        })
-                                })
-                                .collect();
-                            coords.map(|c| geo::LineString::from(c))
-                        })
-                        .collect();
-                    
-                    Ok(geo::Polygon::new(
-                        geo::LineString::from(exterior_coords?),
-                        interiors?,
-                    ))
-                })
-                .collect();
+            let polygons: Result<Vec<_>> =
+                mp.0.iter()
+                    .map(|poly| {
+                        let exterior_coords: Result<Vec<_>> = poly
+                            .exterior()
+                            .0
+                            .iter()
+                            .map(|coord| {
+                                proj.convert((coord.x, coord.y))
+                                    .map(|(x, y)| geo::Coord { x, y })
+                                    .map_err(|e| GeoragError::ConfigInvalid {
+                                        key: "crs".to_string(),
+                                        reason: format!("Projection failed: {}", e),
+                                    })
+                            })
+                            .collect();
+
+                        let interiors: Result<Vec<_>> = poly
+                            .interiors()
+                            .iter()
+                            .map(|interior| {
+                                let coords: Result<Vec<_>> = interior
+                                    .0
+                                    .iter()
+                                    .map(|coord| {
+                                        proj.convert((coord.x, coord.y))
+                                            .map(|(x, y)| geo::Coord { x, y })
+                                            .map_err(|e| GeoragError::ConfigInvalid {
+                                                key: "crs".to_string(),
+                                                reason: format!("Projection failed: {}", e),
+                                            })
+                                    })
+                                    .collect();
+                                coords.map(geo::LineString::from)
+                            })
+                            .collect();
+
+                        Ok(geo::Polygon::new(geo::LineString::from(exterior_coords?), interiors?))
+                    })
+                    .collect();
             Geometry::MultiPolygon(geo::MultiPolygon(polygons?))
         }
     };
@@ -194,7 +186,11 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
 
 /// Normalize a geometry to a target CRS
 /// This is an alias for reproject_geometry with clearer intent
-pub fn normalize_geometry(geometry: &Geometry, from_crs: &Crs, target_crs: &Crs) -> Result<Geometry> {
+pub fn normalize_geometry(
+    geometry: &Geometry,
+    from_crs: &Crs,
+    target_crs: &Crs,
+) -> Result<Geometry> {
     reproject_geometry(geometry, from_crs, target_crs)
 }
 

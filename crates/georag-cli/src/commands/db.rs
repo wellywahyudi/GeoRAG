@@ -1,15 +1,11 @@
-//! Database management commands
-
 use crate::cli::{DbArgs, DbCommand};
 use crate::output::OutputWriter;
-use anyhow::{Result, Context};
-use georag_store::postgres::{PostgresStore, PostgresConfig};
+use anyhow::{Context, Result};
+use georag_store::postgres::{PostgresConfig, PostgresStore};
 
 /// Execute database management commands
 pub fn execute(args: DbArgs, output: &OutputWriter, dry_run: bool) -> Result<()> {
-    // Create async runtime
-    let rt = tokio::runtime::Runtime::new()
-        .context("Failed to create async runtime")?;
+    let rt = tokio::runtime::Runtime::new().context("Failed to create async runtime")?;
 
     rt.block_on(async {
         // Load PostgreSQL configuration
@@ -17,17 +13,13 @@ pub fn execute(args: DbArgs, output: &OutputWriter, dry_run: bool) -> Result<()>
             .context("Failed to load database configuration. Ensure DATABASE_URL is set.")?;
 
         // Create store connection
-        let store = PostgresStore::new(config)
-            .await
-            .context("Failed to connect to database")?;
+        let store = PostgresStore::new(config).await.context("Failed to connect to database")?;
 
         match args.command {
             DbCommand::Rebuild(rebuild_args) => {
                 execute_rebuild(&store, rebuild_args, output, dry_run).await
             }
-            DbCommand::Stats(stats_args) => {
-                execute_stats(&store, stats_args, output).await
-            }
+            DbCommand::Stats(stats_args) => execute_stats(&store, stats_args, output).await,
             DbCommand::Vacuum(vacuum_args) => {
                 execute_vacuum(&store, vacuum_args, output, dry_run).await
             }
@@ -48,7 +40,7 @@ async fn execute_rebuild(
             output.info("  - Using CONCURRENTLY option (non-blocking)");
         }
         if let Some(ref index_name) = args.index {
-            output.info(&format!("  - Target index: {}", index_name));
+            output.info(format!("  - Target index: {}", index_name));
         } else {
             output.info("  - Target: All indexes");
         }
@@ -57,20 +49,20 @@ async fn execute_rebuild(
 
     output.info("Rebuilding indexes...");
 
-    let result = store.rebuild_indexes(args.index.as_deref(), args.concurrently)
+    let result = store
+        .rebuild_indexes(args.index.as_deref(), args.concurrently)
         .await
         .context("Failed to rebuild indexes")?;
 
-    output.success(&format!(
+    output.success(format!(
         "Successfully rebuilt {} index(es) in {:.2}s",
-        result.indexes_rebuilt,
-        result.duration_secs
+        result.indexes_rebuilt, result.duration_secs
     ));
 
     if !result.warnings.is_empty() {
         output.warning("Warnings:");
         for warning in &result.warnings {
-            output.warning(&format!("  - {}", warning));
+            output.warning(format!("  - {}", warning));
         }
     }
 
@@ -85,7 +77,8 @@ async fn execute_stats(
 ) -> Result<()> {
     output.info("Fetching index statistics...");
 
-    let stats = store.get_index_stats(args.index.as_deref())
+    let stats = store
+        .get_index_stats(args.index.as_deref())
         .await
         .context("Failed to get index statistics")?;
 
@@ -94,23 +87,23 @@ async fn execute_stats(
         return Ok(());
     }
 
-    output.info(&format!("\nFound {} index(es):\n", stats.len()));
+    output.info(format!("\nFound {} index(es):\n", stats.len()));
 
     for stat in stats {
-        output.info(&format!("Index: {}", stat.index_name));
-        output.info(&format!("  Table: {}", stat.table_name));
-        output.info(&format!("  Type: {}", stat.index_type));
-        output.info(&format!("  Size: {}", format_bytes(stat.size_bytes)));
-        output.info(&format!("  Rows: {}", stat.row_count));
-        
+        output.info(format!("Index: {}", stat.index_name));
+        output.info(format!("  Table: {}", stat.table_name));
+        output.info(format!("  Type: {}", stat.index_type));
+        output.info(format!("  Size: {}", format_bytes(stat.size_bytes)));
+        output.info(format!("  Rows: {}", stat.row_count));
+
         if let Some(last_vacuum) = stat.last_vacuum {
-            output.info(&format!("  Last Vacuum: {}", last_vacuum));
+            output.info(format!("  Last Vacuum: {}", last_vacuum));
         }
-        
+
         if let Some(last_analyze) = stat.last_analyze {
-            output.info(&format!("  Last Analyze: {}", last_analyze));
+            output.info(format!("  Last Analyze: {}", last_analyze));
         }
-        
+
         output.info("");
     }
 
@@ -133,7 +126,7 @@ async fn execute_vacuum(
             output.info("  - FULL vacuum (locks table)");
         }
         if let Some(ref table) = args.table {
-            output.info(&format!("  - Target table: {}", table));
+            output.info(format!("  - Target table: {}", table));
         } else {
             output.info("  - Target: All tables");
         }
@@ -142,24 +135,20 @@ async fn execute_vacuum(
 
     output.info("Running VACUUM...");
 
-    let result = store.vacuum_analyze(
-        args.table.as_deref(),
-        args.analyze,
-        args.full,
-    )
-    .await
-    .context("Failed to run VACUUM")?;
+    let result = store
+        .vacuum_analyze(args.table.as_deref(), args.analyze, args.full)
+        .await
+        .context("Failed to run VACUUM")?;
 
-    output.success(&format!(
+    output.success(format!(
         "Successfully vacuumed {} table(s) in {:.2}s",
-        result.tables_processed,
-        result.duration_secs
+        result.tables_processed, result.duration_secs
     ));
 
     if !result.warnings.is_empty() {
         output.warning("Warnings:");
         for warning in &result.warnings {
-            output.warning(&format!("  - {}", warning));
+            output.warning(format!("  - {}", warning));
         }
     }
 
@@ -169,19 +158,19 @@ async fn execute_vacuum(
 /// Format bytes into human-readable format
 fn format_bytes(bytes: i64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-    
+
     if bytes < 0 {
         return "N/A".to_string();
     }
-    
+
     let mut size = bytes as f64;
     let mut unit_idx = 0;
-    
+
     while size >= 1024.0 && unit_idx < UNITS.len() - 1 {
         size /= 1024.0;
         unit_idx += 1;
     }
-    
+
     if unit_idx == 0 {
         format!("{} {}", bytes, UNITS[0])
     } else {

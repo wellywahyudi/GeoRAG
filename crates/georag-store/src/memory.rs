@@ -1,5 +1,3 @@
-//! In-memory storage adapters for testing and development
-
 use async_trait::async_trait;
 use georag_core::error::Result;
 use georag_core::models::query::{DistanceUnit, SpatialPredicate};
@@ -72,14 +70,14 @@ impl SpatialStore for MemorySpatialStore {
     async fn store_features(&self, features: &[Feature]) -> Result<()> {
         let mut store = self.features.write().unwrap();
         for feature in features {
-            store.insert(feature.id.clone(), feature.clone());
+            store.insert(feature.id, feature.clone());
         }
         Ok(())
     }
 
     async fn spatial_query(&self, filter: &SpatialFilter) -> Result<Vec<Feature>> {
         let features = self.features.read().unwrap();
-        
+
         // Convert georag_core::models::SpatialFilter to georag_geo::models::SpatialFilter
         let _geo_filter = georag_geo::models::SpatialFilter {
             predicate: match filter.predicate {
@@ -88,7 +86,7 @@ impl SpatialStore for MemorySpatialStore {
                 SpatialPredicate::Contains => georag_geo::models::SpatialPredicate::Contains,
                 SpatialPredicate::BoundingBox => georag_geo::models::SpatialPredicate::BoundingBox,
             },
-            geometry: filter.geometry.as_ref().and_then(|_g| {
+            geometry: filter.geometry.as_ref().and({
                 // Convert serde_json::Value to georag_geo::models::Geometry
                 // For now, return None - this would need proper GeoJSON parsing
                 None
@@ -162,7 +160,12 @@ impl VectorStore for MemoryVectorStore {
         Ok(())
     }
 
-    async fn similarity_search(&self, query: &[f32], k: usize, threshold: Option<f32>) -> Result<Vec<ScoredResult>> {
+    async fn similarity_search(
+        &self,
+        query: &[f32],
+        k: usize,
+        threshold: Option<f32>,
+    ) -> Result<Vec<ScoredResult>> {
         let embeddings = self.embeddings.read().unwrap();
 
         let mut results: Vec<ScoredResult> = embeddings
@@ -206,11 +209,7 @@ impl VectorStore for MemoryVectorStore {
 
     async fn dimensions(&self) -> Result<usize> {
         let embeddings = self.embeddings.read().unwrap();
-        Ok(embeddings
-            .values()
-            .next()
-            .map(|e| e.vector.len())
-            .unwrap_or(0))
+        Ok(embeddings.values().next().map(|e| e.vector.len()).unwrap_or(0))
     }
 }
 
@@ -239,10 +238,7 @@ impl DocumentStore for MemoryDocumentStore {
 
     async fn get_chunks(&self, ids: &[ChunkId]) -> Result<Vec<TextChunk>> {
         let chunks = self.chunks.read().unwrap();
-        Ok(ids
-            .iter()
-            .filter_map(|id| chunks.get(id).cloned())
-            .collect())
+        Ok(ids.iter().filter_map(|id| chunks.get(id).cloned()).collect())
     }
 
     async fn get_chunk(&self, id: ChunkId) -> Result<Option<TextChunk>> {

@@ -1,4 +1,4 @@
-//! Interactive mode utilities for user-friendly CLI experience
+#![allow(dead_code)]
 
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Select};
@@ -9,10 +9,8 @@ pub fn interactive_init() -> Result<InteractiveInitResult> {
     println!("\n🚀 GeoRAG Workspace Setup\n");
 
     // Workspace path
-    let path: String = Input::new()
-        .with_prompt("Workspace path")
-        .default(".".to_string())
-        .interact()?;
+    let path: String =
+        Input::new().with_prompt("Workspace path").default(".".to_string()).interact()?;
 
     // CRS selection
     let crs_options = vec![
@@ -30,9 +28,7 @@ pub fn interactive_init() -> Result<InteractiveInitResult> {
         0 => 4326,
         1 => 3857,
         2 => {
-            let custom: u32 = Input::new()
-                .with_prompt("Enter EPSG code")
-                .interact()?;
+            let custom: u32 = Input::new().with_prompt("Enter EPSG code").interact()?;
             custom
         }
         _ => 4326,
@@ -79,38 +75,35 @@ pub fn interactive_init() -> Result<InteractiveInitResult> {
     // If PostgreSQL, get connection details
     let database_url = if use_postgres {
         println!("\n📦 PostgreSQL Configuration\n");
-        
+
         let host: String = Input::new()
             .with_prompt("PostgreSQL host")
             .default("localhost".to_string())
             .interact()?;
-        
-        let port: u16 = Input::new()
-            .with_prompt("PostgreSQL port")
-            .default(5432)
-            .interact()?;
-        
+
+        let port: u16 = Input::new().with_prompt("PostgreSQL port").default(5432).interact()?;
+
         let database: String = Input::new()
             .with_prompt("Database name")
             .default("georag".to_string())
             .interact()?;
-        
+
         let user: String = Input::new()
             .with_prompt("Username")
             .default("postgres".to_string())
             .interact()?;
-        
+
         let password: String = Input::new()
             .with_prompt("Password (optional, press Enter to skip)")
             .allow_empty(true)
             .interact()?;
-        
+
         let url = if password.is_empty() {
             format!("postgresql://{}@{}:{}/{}", user, host, port, database)
         } else {
             format!("postgresql://{}:{}@{}:{}/{}", user, password, host, port, database)
         };
-        
+
         Some(url)
     } else {
         None
@@ -125,7 +118,7 @@ pub fn interactive_init() -> Result<InteractiveInitResult> {
     println!("  Storage:        {}", if use_postgres { "PostgreSQL" } else { "Memory" });
     if let Some(ref url) = database_url {
         // Hide password in display
-        let display_url = url.split('@').last().unwrap_or(url);
+        let display_url = url.split('@').next_back().unwrap_or(url);
         println!("  Database:       {}", display_url);
     }
     println!();
@@ -159,62 +152,16 @@ pub struct InteractiveInitResult {
     pub database_url: Option<String>,
 }
 
-/// Interactive dataset addition
-pub fn interactive_add() -> Result<InteractiveAddResult> {
-    println!("\n📁 Add Dataset\n");
-
-    // Dataset path
-    let path: String = Input::new()
-        .with_prompt("Dataset file path")
-        .interact()?;
-
-    let path = PathBuf::from(path);
-    if !path.exists() {
-        anyhow::bail!("File not found: {}", path.display());
-    }
-
-    // Dataset name (auto-detect from filename)
-    let default_name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("dataset")
-        .to_string();
-
-    let name: String = Input::new()
-        .with_prompt("Dataset name")
-        .default(default_name)
-        .interact()?;
-
-    // Force flag for CRS mismatch
-    let force = Confirm::new()
-        .with_prompt("Override CRS mismatch warnings?")
-        .default(false)
-        .interact()?;
-
-    Ok(InteractiveAddResult { path, name, force })
-}
-
-/// Result from interactive add
-pub struct InteractiveAddResult {
-    pub path: PathBuf,
-    pub name: String,
-    pub force: bool,
-}
-
 /// Interactive query builder
 pub fn interactive_query() -> Result<InteractiveQueryResult> {
     println!("\n🔍 Query Builder\n");
 
     // Query text
-    let query: String = Input::new()
-        .with_prompt("Query text")
-        .interact()?;
+    let query: String = Input::new().with_prompt("Query text").interact()?;
 
     // Spatial filter
-    let use_spatial = Confirm::new()
-        .with_prompt("Add spatial filter?")
-        .default(false)
-        .interact()?;
+    let use_spatial =
+        Confirm::new().with_prompt("Add spatial filter?").default(false).interact()?;
 
     let (spatial_predicate, geometry, distance) = if use_spatial {
         // Predicate
@@ -240,11 +187,7 @@ pub fn interactive_query() -> Result<InteractiveQueryResult> {
         .to_string();
 
         // Geometry type
-        let geom_types = vec![
-            "Point (latitude, longitude)",
-            "GeoJSON string",
-            "GeoJSON file",
-        ];
+        let geom_types = vec!["Point (latitude, longitude)", "GeoJSON string", "GeoJSON file"];
         let geom_type_idx = Select::new()
             .with_prompt("Geometry type")
             .items(&geom_types)
@@ -253,21 +196,13 @@ pub fn interactive_query() -> Result<InteractiveQueryResult> {
 
         let geometry = match geom_type_idx {
             0 => {
-                let lat: f64 = Input::new()
-                    .with_prompt("Latitude")
-                    .interact()?;
-                let lon: f64 = Input::new()
-                    .with_prompt("Longitude")
-                    .interact()?;
+                let lat: f64 = Input::new().with_prompt("Latitude").interact()?;
+                let lon: f64 = Input::new().with_prompt("Longitude").interact()?;
                 format!(r#"{{"type":"Point","coordinates":[{},{}]}}"#, lon, lat)
             }
-            1 => Input::new()
-                .with_prompt("GeoJSON string")
-                .interact()?,
+            1 => Input::new().with_prompt("GeoJSON string").interact()?,
             2 => {
-                let path: String = Input::new()
-                    .with_prompt("GeoJSON file path")
-                    .interact()?;
+                let path: String = Input::new().with_prompt("GeoJSON file path").interact()?;
                 std::fs::read_to_string(path)?
             }
             _ => String::new(),
@@ -290,10 +225,7 @@ pub fn interactive_query() -> Result<InteractiveQueryResult> {
     };
 
     // Number of results
-    let top_k: usize = Input::new()
-        .with_prompt("Number of results")
-        .default(10)
-        .interact()?;
+    let top_k: usize = Input::new().with_prompt("Number of results").default(10).interact()?;
 
     // Semantic reranking
     let no_rerank = !Confirm::new()

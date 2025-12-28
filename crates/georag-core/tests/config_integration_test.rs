@@ -39,9 +39,7 @@ embedder = "ollama:custom-model"
     )
     .unwrap();
 
-    let config = LayeredConfig::with_defaults()
-        .load_from_file(file.path())
-        .unwrap();
+    let config = LayeredConfig::with_defaults().load_from_file(file.path()).unwrap();
 
     assert_eq!(config.crs.value, 3857);
     assert_eq!(config.crs.source, ConfigSource::File);
@@ -65,9 +63,7 @@ crs = 3857
     )
     .unwrap();
 
-    let config = LayeredConfig::with_defaults()
-        .load_from_file(file.path())
-        .unwrap();
+    let config = LayeredConfig::with_defaults().load_from_file(file.path()).unwrap();
 
     assert_eq!(config.crs.value, 3857);
     assert_eq!(config.crs.source, ConfigSource::File);
@@ -84,7 +80,7 @@ fn test_environment_overrides_file() {
     env::remove_var("GEORAG_CRS");
     env::remove_var("GEORAG_DISTANCE_UNIT");
     env::remove_var("GEORAG_EMBEDDER");
-    
+
     // Set environment variables
     env::set_var("GEORAG_CRS", "32748");
     env::set_var("GEORAG_DISTANCE_UNIT", "miles");
@@ -166,10 +162,10 @@ distance_unit = "Kilometers"
 #[serial]
 fn test_configuration_precedence_order() {
     // Validates Configuration precedence
-    
+
     // Clear any existing env vars first
     env::remove_var("GEORAG_CRS");
-    
+
     env::set_var("GEORAG_CRS", "32748");
 
     let mut file = NamedTempFile::new().unwrap();
@@ -185,10 +181,7 @@ fn test_configuration_precedence_order() {
     assert_eq!(config.crs.source, ConfigSource::Environment);
 
     // Now CLI should override environment
-    config.update_from_cli(CliConfigOverrides {
-        crs: Some(4326),
-        ..Default::default()
-    });
+    config.update_from_cli(CliConfigOverrides { crs: Some(4326), ..Default::default() });
 
     assert_eq!(config.crs.value, 4326);
     assert_eq!(config.crs.source, ConfigSource::Cli);
@@ -207,9 +200,7 @@ fn test_configuration_source_tracking() {
     let mut file = NamedTempFile::new().unwrap();
     writeln!(file, "crs = 3857\ndistance_unit = \"Kilometers\"").unwrap();
 
-    let config = LayeredConfig::with_defaults()
-        .load_from_file(file.path())
-        .unwrap();
+    let config = LayeredConfig::with_defaults().load_from_file(file.path()).unwrap();
 
     let inspection_map = config.to_inspection_map();
 
@@ -230,25 +221,13 @@ fn test_configuration_source_tracking() {
 
 #[test]
 fn test_parse_distance_unit_variations() {
-    assert_eq!(
-        parse_distance_unit("meters").unwrap(),
-        DistanceUnit::Meters
-    );
+    assert_eq!(parse_distance_unit("meters").unwrap(), DistanceUnit::Meters);
     assert_eq!(parse_distance_unit("m").unwrap(), DistanceUnit::Meters);
     assert_eq!(parse_distance_unit("M").unwrap(), DistanceUnit::Meters);
-    assert_eq!(
-        parse_distance_unit("METERS").unwrap(),
-        DistanceUnit::Meters
-    );
+    assert_eq!(parse_distance_unit("METERS").unwrap(), DistanceUnit::Meters);
 
-    assert_eq!(
-        parse_distance_unit("kilometers").unwrap(),
-        DistanceUnit::Kilometers
-    );
-    assert_eq!(
-        parse_distance_unit("km").unwrap(),
-        DistanceUnit::Kilometers
-    );
+    assert_eq!(parse_distance_unit("kilometers").unwrap(), DistanceUnit::Kilometers);
+    assert_eq!(parse_distance_unit("km").unwrap(), DistanceUnit::Kilometers);
 
     assert_eq!(parse_distance_unit("miles").unwrap(), DistanceUnit::Miles);
     assert_eq!(parse_distance_unit("mi").unwrap(), DistanceUnit::Miles);
@@ -261,23 +240,11 @@ fn test_parse_distance_unit_variations() {
 
 #[test]
 fn test_parse_validity_mode_variations() {
-    assert_eq!(
-        parse_validity_mode("strict").unwrap(),
-        ValidityMode::Strict
-    );
-    assert_eq!(
-        parse_validity_mode("STRICT").unwrap(),
-        ValidityMode::Strict
-    );
+    assert_eq!(parse_validity_mode("strict").unwrap(), ValidityMode::Strict);
+    assert_eq!(parse_validity_mode("STRICT").unwrap(), ValidityMode::Strict);
 
-    assert_eq!(
-        parse_validity_mode("lenient").unwrap(),
-        ValidityMode::Lenient
-    );
-    assert_eq!(
-        parse_validity_mode("LENIENT").unwrap(),
-        ValidityMode::Lenient
-    );
+    assert_eq!(parse_validity_mode("lenient").unwrap(), ValidityMode::Lenient);
+    assert_eq!(parse_validity_mode("LENIENT").unwrap(), ValidityMode::Lenient);
 
     assert!(parse_validity_mode("invalid").is_err());
 }

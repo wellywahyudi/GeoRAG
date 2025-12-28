@@ -1,5 +1,3 @@
-//! Storage port trait definitions
-
 use crate::error::Result;
 use crate::models::{
     ChunkId, Dataset, DatasetId, DatasetMeta, Embedding, Feature, ScoredResult, SpatialFilter,

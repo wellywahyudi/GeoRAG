@@ -77,7 +77,7 @@ georag init my-workspace \
 
 ### add
 
-Add a geospatial dataset to the workspace.
+Add a geospatial dataset or batch process multiple datasets from a directory.
 
 **Usage:**
 
@@ -87,28 +87,140 @@ georag add <PATH> [OPTIONS]
 
 **Arguments:**
 
-- `<PATH>` - Path to the dataset file (GeoJSON, Shapefile, etc.)
+- `<PATH>` - Path to a dataset file or directory
+  - **File**: Single dataset (GeoJSON, Shapefile, GPX, KML, PDF, DOCX)
+  - **Directory**: All supported files in the directory will be processed
 
 **Options:**
 
-- `--name <NAME>` - Dataset name (default: filename)
+- `--name <NAME>` - Dataset name (default: filename, only for single files)
 - `--force` - Override CRS mismatch warning
-- `-i, --interactive` - Interactive mode with prompts
+- `-i, --interactive` - Interactive mode with prompts (disabled in batch mode)
+- `--track-type <TYPE>` - GPX track type filter: tracks, routes, waypoints, all (GPX only)
+- `--folder <PATH>` - KML folder path to extract, e.g., "Parent/Child" (KML only)
+- `--geometry <GEOMETRY>` - Associate geometry with documents (PDF, DOCX only)
+  - Can be inline GeoJSON: `'{"type":"Point","coordinates":[-122.4,47.6]}'`
+  - Or path to GeoJSON file: `location.geojson`
+- `--parallel` - Process files in parallel (default: true, batch mode only)
+
+**Supported Formats:**
+
+| Format    | Extensions | Description                    |
+| --------- | ---------- | ------------------------------ |
+| GeoJSON   | `.geojson` | Standard geospatial JSON       |
+| Shapefile | `.shp`     | ESRI Shapefile (requires .dbf) |
+| GPX       | `.gpx`     | GPS tracks and waypoints       |
+| KML       | `.kml`     | Google Earth format            |
+| PDF       | `.pdf`     | Document with text extraction  |
+| DOCX      | `.docx`    | Word document                  |
 
 **Examples:**
 
 ```bash
-# Add a dataset
+# Add a single dataset
 georag add data/cities.geojson
-
-# Interactive mode
-georag add --interactive
 
 # Add with custom name
 georag add data/cities.geojson --name "World Cities"
 
 # Force add despite CRS mismatch
 georag add data/cities.geojson --force
+
+# Batch process all files in a directory
+georag add data/
+
+# Preview batch processing
+georag add data/ --dry-run
+
+# Add GPX with track type filter
+georag add track.gpx --track-type tracks
+
+# Add KML with folder filter
+georag add places.kml --folder "My Places/Favorites"
+
+# Add PDF with associated geometry (inline)
+georag add report.pdf --geometry '{"type":"Point","coordinates":[-122.4,47.6]}'
+
+# Add PDF with associated geometry (from file)
+georag add report.pdf --geometry location.geojson
+
+# Interactive mode
+georag add --interactive
+```
+
+**Batch Processing:**
+
+When a directory is provided, GeoRAG will:
+
+1. **Scan** the directory for all supported file formats
+2. **Report** the number of files found
+3. **Process** each file sequentially with progress updates
+4. **Continue** processing even if individual files fail
+5. **Display** a summary showing:
+   - Total files processed
+   - Success/failure counts overall
+   - Success/failure counts by format
+   - List of successful files with dataset names
+   - List of failed files with error messages
+
+**Batch Output Example:**
+
+```
+ℹ Scanning directory: data/
+ℹ Found 5 supported files
+ℹ [1/5] Processing data/cities.geojson (GeoJSON, 1024 bytes)
+✓ Added dataset: cities
+ℹ [2/5] Processing data/roads.shp (Shapefile, 2048 bytes)
+✓ Added dataset: roads
+ℹ [3/5] Processing data/track.gpx (GPX, 512 bytes)
+✓ Added dataset: track
+ℹ [4/5] Processing data/places.kml (KML, 768 bytes)
+✓ Added dataset: places
+ℹ [5/5] Processing data/report.pdf (PDF, 4096 bytes)
+✓ Added dataset: report
+
+Batch Processing Summary
+Total Files: 5
+Successful: 5
+Failed: 0
+
+Summary by Format
+GeoJSON: 1 successful, 0 failed
+Shapefile: 1 successful, 0 failed
+GPX: 1 successful, 0 failed
+KML: 1 successful, 0 failed
+PDF: 1 successful, 0 failed
+
+Successfully Processed
+data/cities.geojson - cities (GeoJSON)
+data/roads.shp - roads (Shapefile)
+data/track.gpx - track (GPX)
+data/places.kml - places (KML)
+data/report.pdf - report (PDF)
+```
+
+**Error Handling:**
+
+Batch processing is resilient to errors:
+
+```bash
+# Even if some files fail, processing continues
+georag add data/
+
+# Output shows both successes and failures:
+# Batch Processing Summary
+# Total Files: 5
+# Successful: 3
+# Failed: 2
+#
+# Summary by Format
+# GeoJSON: 2 successful, 0 failed
+# Shapefile: 0 successful, 1 failed
+# PDF: 1 successful, 1 failed
+#
+# Failed Files
+# data/corrupt.shp (Shapefile) - Missing required file: .dbf
+# data/empty.pdf (PDF) - PDF contains no extractable text
 ```
 
 ---
@@ -526,6 +638,50 @@ georag query "major cities" --top-k 10
 georag doctor
 ```
 
+### Batch Processing Workflow
+
+```bash
+# 1. Initialize workspace
+georag init
+
+# 2. Preview what would be added
+georag add data/ --dry-run
+
+# 3. Batch add all files from directory
+georag add data/
+
+# 4. Check what was added
+georag status --datasets
+
+# 5. Build index
+georag build
+
+# 6. Query across all datasets
+georag query "search term"
+```
+
+### Mixed Format Workflow
+
+```bash
+# Add different format types
+georag add geospatial/cities.geojson
+georag add geospatial/roads.shp
+georag add tracks/hike.gpx
+georag add places/favorites.kml
+georag add documents/report.pdf --geometry region.geojson
+
+# Or batch process mixed formats
+georag add mixed_data/
+
+# Build unified index
+georag build
+
+# Query across all formats
+georag query "what's in this area?" \
+  --spatial within \
+  --geometry area.geojson
+```
+
 ### Using PostgreSQL
 
 ```bash
@@ -575,7 +731,7 @@ set -e  # Exit on error
 # Initialize
 georag init .
 
-# Add datasets
+# Add datasets individually
 for file in data/*.geojson; do
   georag add "$file"
 done
@@ -587,6 +743,60 @@ georag build
 georag query "What features exist?" > results.txt
 ```
 
+### Batch Processing Script
+
+```bash
+#!/bin/bash
+set -e
+
+# Initialize workspace
+georag init my-workspace
+
+# Batch process all supported files
+georag add data/
+
+# Check results
+if georag status --json | jq -e '.data.dataset_count > 0'; then
+  echo "Datasets added successfully"
+
+  # Build index
+  georag build
+
+  # Run queries
+  georag query "search term" > results.txt
+else
+  echo "No datasets were added"
+  exit 1
+fi
+```
+
+### Error-Tolerant Batch Script
+
+```bash
+#!/bin/bash
+
+# Initialize
+georag init .
+
+# Try to add from multiple directories
+# Continue even if some directories fail
+for dir in data/*; do
+  if [ -d "$dir" ]; then
+    echo "Processing directory: $dir"
+    georag add "$dir" || echo "Warning: Failed to process $dir"
+  fi
+done
+
+# Build if we have any datasets
+dataset_count=$(georag status --json | jq '.data.dataset_count')
+if [ "$dataset_count" -gt 0 ]; then
+  echo "Building index for $dataset_count datasets"
+  georag build
+else
+  echo "No datasets to index"
+fi
+```
+
 ---
 
 ## Tips
@@ -596,3 +806,8 @@ georag query "What features exist?" > results.txt
 3. **Use config files for teams**: Share `.georag/config.toml`
 4. **Check status before querying**: `georag status`
 5. **Use --dry-run to preview**: `georag build --dry-run`
+6. **Batch process directories**: `georag add data/` instead of adding files one by one
+7. **Preview batch operations**: `georag add data/ --dry-run` to see what would be processed
+8. **Mix formats freely**: Batch processing handles GeoJSON, Shapefile, GPX, KML, PDF, and DOCX together
+9. **Check batch results**: Review the summary to see which files succeeded or failed
+10. **Use format-specific options**: Apply `--track-type` for GPX or `--folder` for KML in batch mode

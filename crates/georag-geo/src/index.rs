@@ -1,8 +1,3 @@
-//! Spatial indexing using R*-tree
-//!
-//! This module provides efficient spatial indexing for fast geometric queries.
-//! The R*-tree is a balanced tree structure optimized for spatial data.
-
 use crate::models::{Geometry, SpatialFilter};
 use crate::spatial::evaluate_spatial_filter;
 use geo::Geometry as GeoGeometry;
@@ -13,10 +8,10 @@ use rstar::{RTree, RTreeObject, AABB};
 pub struct IndexedGeometry {
     /// Unique identifier for this geometry
     pub id: usize,
-    
+
     /// The geometry itself
     pub geometry: Geometry,
-    
+
     /// Bounding box for spatial indexing
     envelope: AABB<[f64; 2]>,
 }
@@ -25,11 +20,7 @@ impl IndexedGeometry {
     /// Create a new indexed geometry
     pub fn new(id: usize, geometry: Geometry) -> Self {
         let envelope = Self::compute_envelope(&geometry);
-        Self {
-            id,
-            geometry,
-            envelope,
-        }
+        Self { id, geometry, envelope }
     }
 
     /// Compute the bounding box (envelope) for a geometry
@@ -37,7 +28,7 @@ impl IndexedGeometry {
         use geo::algorithm::bounding_rect::BoundingRect;
 
         let geo_geom: GeoGeometry = geometry.clone().into();
-        
+
         match geo_geom.bounding_rect() {
             Some(rect) => {
                 let min = rect.min();
@@ -68,9 +59,7 @@ pub struct SpatialIndex {
 impl SpatialIndex {
     /// Create a new empty spatial index
     pub fn new() -> Self {
-        Self {
-            tree: RTree::new(),
-        }
+        Self { tree: RTree::new() }
     }
 
     /// Create a spatial index from a collection of geometries
@@ -80,9 +69,7 @@ impl SpatialIndex {
             .map(|(id, geom)| IndexedGeometry::new(id, geom))
             .collect();
 
-        Self {
-            tree: RTree::bulk_load(indexed),
-        }
+        Self { tree: RTree::bulk_load(indexed) }
     }
 
     /// Insert a geometry into the index
@@ -94,10 +81,7 @@ impl SpatialIndex {
     /// Remove a geometry from the index by ID
     pub fn remove(&mut self, id: usize) -> Option<Geometry> {
         // Find the geometry with this ID
-        let to_remove = self.tree
-            .iter()
-            .find(|g| g.id == id)
-            .cloned();
+        let to_remove = self.tree.iter().find(|g| g.id == id).cloned();
 
         if let Some(indexed) = to_remove {
             self.tree.remove(&indexed);
@@ -110,9 +94,7 @@ impl SpatialIndex {
     /// Query geometries within a bounding box
     pub fn query_bbox(&self, min: [f64; 2], max: [f64; 2]) -> Vec<&IndexedGeometry> {
         let bbox = AABB::from_corners(min, max);
-        self.tree
-            .locate_in_envelope(&bbox)
-            .collect()
+        self.tree.locate_in_envelope(&bbox).collect()
     }
 
     /// Query geometries near a point within a distance
@@ -139,7 +121,7 @@ impl SpatialIndex {
     fn distance_to_envelope(&self, envelope: &AABB<[f64; 2]>, point: [f64; 2]) -> f64 {
         let lower = envelope.lower();
         let upper = envelope.upper();
-        
+
         let dx = if point[0] < lower[0] {
             lower[0] - point[0]
         } else if point[0] > upper[0] {
@@ -147,7 +129,7 @@ impl SpatialIndex {
         } else {
             0.0
         };
-        
+
         let dy = if point[1] < lower[1] {
             lower[1] - point[1]
         } else if point[1] > upper[1] {
@@ -155,7 +137,7 @@ impl SpatialIndex {
         } else {
             0.0
         };
-        
+
         (dx * dx + dy * dy).sqrt()
     }
 
@@ -164,7 +146,7 @@ impl SpatialIndex {
         // First, get candidates using bounding box query
         let candidates = if let Some(filter_geom) = &filter.geometry {
             let geo_geom: GeoGeometry = filter_geom.clone().into();
-            
+
             use geo::algorithm::bounding_rect::BoundingRect;
             if let Some(bbox) = geo_geom.bounding_rect() {
                 let min = bbox.min();
@@ -222,9 +204,7 @@ pub struct SpatialIndexBuilder {
 impl SpatialIndexBuilder {
     /// Create a new builder
     pub fn new() -> Self {
-        Self {
-            geometries: Vec::new(),
-        }
+        Self { geometries: Vec::new() }
     }
 
     /// Add a geometry to the builder
@@ -268,9 +248,9 @@ mod tests {
     fn test_spatial_index_insert() {
         let mut index = SpatialIndex::new();
         let point = Geometry::Point(Point::new(1.0, 2.0));
-        
+
         index.insert(1, point);
-        
+
         assert_eq!(index.len(), 1);
         assert!(!index.is_empty());
     }
@@ -279,10 +259,10 @@ mod tests {
     fn test_spatial_index_remove() {
         let mut index = SpatialIndex::new();
         let point = Geometry::Point(Point::new(1.0, 2.0));
-        
+
         index.insert(1, point.clone());
         assert_eq!(index.len(), 1);
-        
+
         let removed = index.remove(1);
         assert!(removed.is_some());
         assert_eq!(index.len(), 0);
@@ -291,15 +271,15 @@ mod tests {
     #[test]
     fn test_spatial_index_bbox_query() {
         let mut index = SpatialIndex::new();
-        
+
         // Add points in a grid
         index.insert(1, Geometry::Point(Point::new(0.0, 0.0)));
         index.insert(2, Geometry::Point(Point::new(5.0, 5.0)));
         index.insert(3, Geometry::Point(Point::new(10.0, 10.0)));
-        
+
         // Query a bounding box that should contain only the first two points
         let results = index.query_bbox([0.0, 0.0], [6.0, 6.0]);
-        
+
         assert_eq!(results.len(), 2);
         let ids: Vec<usize> = results.iter().map(|g| g.id).collect();
         assert!(ids.contains(&1));
@@ -310,14 +290,14 @@ mod tests {
     #[test]
     fn test_spatial_index_nearest() {
         let mut index = SpatialIndex::new();
-        
+
         index.insert(1, Geometry::Point(Point::new(0.0, 0.0)));
         index.insert(2, Geometry::Point(Point::new(5.0, 5.0)));
         index.insert(3, Geometry::Point(Point::new(10.0, 10.0)));
-        
+
         // Find nearest to (1, 1)
         let results = index.query_k_nearest([1.0, 1.0], 1);
-        
+
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, 1);
     }
@@ -326,19 +306,16 @@ mod tests {
     fn test_spatial_index_builder() {
         let point1 = Geometry::Point(Point::new(0.0, 0.0));
         let point2 = Geometry::Point(Point::new(5.0, 5.0));
-        
-        let index = SpatialIndexBuilder::new()
-            .add(1, point1)
-            .add(2, point2)
-            .build();
-        
+
+        let index = SpatialIndexBuilder::new().add(1, point1).add(2, point2).build();
+
         assert_eq!(index.len(), 2);
     }
 
     #[test]
     fn test_spatial_index_filter() {
         let mut index = SpatialIndex::new();
-        
+
         // Create a square polygon
         let square = Geometry::Polygon(geo::Polygon::new(
             geo::LineString::from(vec![
@@ -350,17 +327,17 @@ mod tests {
             ]),
             vec![],
         ));
-        
+
         // Add points inside and outside the square
         index.insert(1, Geometry::Point(Point::new(5.0, 5.0))); // Inside
         index.insert(2, Geometry::Point(Point::new(15.0, 15.0))); // Outside
-        
+
         // Query with Within predicate
-        let filter = SpatialFilter::new(SpatialPredicate::Within, Crs::wgs84())
-            .with_geometry(square);
-        
+        let filter =
+            SpatialFilter::new(SpatialPredicate::Within, Crs::wgs84()).with_geometry(square);
+
         let results = index.query_filter(&filter);
-        
+
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], 1);
     }
@@ -370,11 +347,11 @@ mod tests {
         let mut index = SpatialIndex::new();
         index.insert(1, Geometry::Point(Point::new(0.0, 0.0)));
         index.insert(2, Geometry::Point(Point::new(5.0, 5.0)));
-        
+
         assert_eq!(index.len(), 2);
-        
+
         index.clear();
-        
+
         assert_eq!(index.len(), 0);
         assert!(index.is_empty());
     }

@@ -1,5 +1,3 @@
-//! Geometry validation
-
 use crate::models::{Geometry, ValidityMode};
 use georag_core::error::{GeoragError, Result};
 
@@ -20,18 +18,12 @@ pub struct ValidationError {
 impl ValidationResult {
     /// Create a valid result
     pub fn valid() -> Self {
-        Self {
-            is_valid: true,
-            errors: Vec::new(),
-        }
+        Self { is_valid: true, errors: Vec::new() }
     }
 
     /// Create an invalid result with errors
     pub fn invalid(errors: Vec<ValidationError>) -> Self {
-        Self {
-            is_valid: false,
-            errors,
-        }
+        Self { is_valid: false, errors }
     }
 
     /// Add an error to the result
@@ -81,10 +73,8 @@ fn validate_linestring(linestring: &geo::LineString) -> ValidationResult {
     // Check each point
     for (i, coord) in linestring.0.iter().enumerate() {
         if !coord.x.is_finite() || !coord.y.is_finite() {
-            result.add_error(
-                format!("LineString[{}]", i),
-                "Coordinates must be finite".to_string(),
-            );
+            result
+                .add_error(format!("LineString[{}]", i), "Coordinates must be finite".to_string());
         }
     }
 
@@ -138,13 +128,10 @@ fn validate_polygon(polygon: &geo::Polygon) -> ValidationResult {
 
 fn validate_multipoint(multipoint: &geo::MultiPoint) -> ValidationResult {
     let mut result = ValidationResult::valid();
-
     for (i, point) in multipoint.0.iter().enumerate() {
         if !point.x().is_finite() || !point.y().is_finite() {
-            result.add_error(
-                format!("MultiPoint[{}]", i),
-                "Coordinates must be finite".to_string(),
-            );
+            result
+                .add_error(format!("MultiPoint[{}]", i), "Coordinates must be finite".to_string());
         }
     }
 
@@ -158,10 +145,8 @@ fn validate_multilinestring(multilinestring: &geo::MultiLineString) -> Validatio
         let ls_result = validate_linestring(linestring);
         if !ls_result.is_valid {
             for error in ls_result.errors {
-                result.add_error(
-                    format!("MultiLineString[{}].{}", i, error.location),
-                    error.reason,
-                );
+                result
+                    .add_error(format!("MultiLineString[{}].{}", i, error.location), error.reason);
             }
         }
     }
@@ -176,10 +161,7 @@ fn validate_multipolygon(multipolygon: &geo::MultiPolygon) -> ValidationResult {
         let poly_result = validate_polygon(polygon);
         if !poly_result.is_valid {
             for error in poly_result.errors {
-                result.add_error(
-                    format!("MultiPolygon[{}].{}", i, error.location),
-                    error.reason,
-                );
+                result.add_error(format!("MultiPolygon[{}].{}", i, error.location), error.reason);
             }
         }
     }
@@ -189,35 +171,32 @@ fn validate_multipolygon(multipolygon: &geo::MultiPolygon) -> ValidationResult {
 
 /// Attempt to fix invalid geometries
 pub fn fix_geometry(geometry: &Geometry) -> Result<Geometry> {
-    // For now, we'll implement basic fixes
-    // More sophisticated fixes can be added later
     match geometry {
         Geometry::Polygon(poly) => {
-            // Try to fix self-intersections and other issues
-            // For now, just return the original if it's valid
             let validation = validate_polygon(poly);
             if validation.is_valid {
                 Ok(geometry.clone())
             } else {
-                // Could use geo::algorithm::simplify or other methods
-                // For now, just return an error
                 Err(GeoragError::InvalidGeometry {
                     feature_id: "unknown".to_string(),
-                    reason: validation.errors.first()
+                    reason: validation
+                        .errors
+                        .first()
                         .map(|e| e.reason.clone())
                         .unwrap_or_else(|| "Invalid geometry".to_string()),
                 })
             }
         }
         _ => {
-            // For other geometry types, validate and return
             let validation = validate_geometry(geometry, ValidityMode::Strict);
             if validation.is_valid {
                 Ok(geometry.clone())
             } else {
                 Err(GeoragError::InvalidGeometry {
                     feature_id: "unknown".to_string(),
-                    reason: validation.errors.first()
+                    reason: validation
+                        .errors
+                        .first()
                         .map(|e| e.reason.clone())
                         .unwrap_or_else(|| "Invalid geometry".to_string()),
                 })
@@ -228,8 +207,5 @@ pub fn fix_geometry(geometry: &Geometry) -> Result<Geometry> {
 
 /// Count invalid geometries in a collection
 pub fn count_invalid_geometries(geometries: &[Geometry], mode: ValidityMode) -> usize {
-    geometries
-        .iter()
-        .filter(|g| !validate_geometry(g, mode).is_valid)
-        .count()
+    geometries.iter().filter(|g| !validate_geometry(g, mode).is_valid).count()
 }

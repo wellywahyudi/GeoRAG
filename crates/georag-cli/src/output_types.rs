@@ -1,5 +1,3 @@
-//! Structured output types for JSON serialization
-
 use chrono::{DateTime, Utc};
 use georag_core::models::dataset::GeometryType;
 use serde::Serialize;

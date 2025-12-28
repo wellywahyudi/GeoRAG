@@ -1,5 +1,3 @@
-//! Error types for GeoRAG
-
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -23,10 +21,7 @@ pub enum GeoragError {
     },
 
     #[error("Invalid geometry at feature {feature_id}: {reason}")]
-    InvalidGeometry {
-        feature_id: String,
-        reason: String,
-    },
+    InvalidGeometry { feature_id: String, reason: String },
 
     // Index errors
     #[error("Index not built. Run 'georag build' first")]
@@ -37,10 +32,7 @@ pub enum GeoragError {
 
     // Embedder errors
     #[error("Embedder unavailable: {reason}. Try: {remediation}")]
-    EmbedderUnavailable {
-        reason: String,
-        remediation: String,
-    },
+    EmbedderUnavailable { reason: String, remediation: String },
 
     // Configuration errors
     #[error("Missing required configuration: {key}")]
@@ -65,51 +57,28 @@ pub enum GeoragError {
     },
 
     #[error("Format error for {format}: {message}")]
-    FormatError {
-        format: String,
-        message: String,
-    },
+    FormatError { format: String, message: String },
 
     #[error("Format validation failed for {format}: {reason}")]
-    FormatValidation {
-        format: String,
-        reason: String,
-    },
+    FormatValidation { format: String, reason: String },
 
     #[error("Document extraction failed for {format}: {reason}")]
-    DocumentExtraction {
-        format: String,
-        reason: String,
-    },
+    DocumentExtraction { format: String, reason: String },
 
     #[error("Layer '{layer}' not found. Available layers: {}", available.join(", "))]
-    LayerNotFound {
-        layer: String,
-        available: Vec<String>,
-    },
+    LayerNotFound { layer: String, available: Vec<String> },
 
     #[error("CRS extraction failed for {format}: {reason}")]
-    CrsExtraction {
-        format: String,
-        reason: String,
-    },
+    CrsExtraction { format: String, reason: String },
 
     #[error("Missing required components for {format}: {}", missing.join(", "))]
-    ComponentMissing {
-        format: String,
-        missing: Vec<String>,
-    },
+    ComponentMissing { format: String, missing: Vec<String> },
 
     #[error("File not found: {path}")]
-    FileNotFound {
-        path: PathBuf,
-    },
+    FileNotFound { path: PathBuf },
 
     #[error("Invalid path {path}: {reason}")]
-    InvalidPath {
-        path: PathBuf,
-        reason: String,
-    },
+    InvalidPath { path: PathBuf, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, GeoragError>;

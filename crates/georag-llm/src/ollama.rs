@@ -1,5 +1,3 @@
-//! Ollama embedder adapter
-
 use crate::ports::Embedder;
 use georag_core::error::{GeoragError, Result};
 use serde::{Deserialize, Serialize};
@@ -8,24 +6,19 @@ use serde::{Deserialize, Serialize};
 pub struct OllamaEmbedder {
     /// Base URL for Ollama API (e.g., "http://localhost:11434")
     base_url: String,
-    
+
     /// Model name to use for embeddings
     model: String,
-    
+
     /// Embedding dimensions (model-specific)
     dimensions: usize,
-    
+
     /// HTTP client
     client: reqwest::Client,
 }
 
 impl OllamaEmbedder {
     /// Create a new Ollama embedder
-    ///
-    /// # Arguments
-    /// * `base_url` - Base URL for Ollama API (default: "http://localhost:11434")
-    /// * `model` - Model name (e.g., "nomic-embed-text")
-    /// * `dimensions` - Expected embedding dimensions
     pub fn new(base_url: impl Into<String>, model: impl Into<String>, dimensions: usize) -> Self {
         Self {
             base_url: base_url.into(),
@@ -44,8 +37,8 @@ impl OllamaEmbedder {
 impl Embedder for OllamaEmbedder {
     fn embed(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
         // Use tokio runtime to execute async request
-        let runtime = tokio::runtime::Runtime::new()
-            .map_err(|e| GeoragError::EmbedderUnavailable {
+        let runtime =
+            tokio::runtime::Runtime::new().map_err(|e| GeoragError::EmbedderUnavailable {
                 reason: format!("Failed to create async runtime: {}", e),
                 remediation: "Ensure tokio is properly configured".to_string(),
             })?;

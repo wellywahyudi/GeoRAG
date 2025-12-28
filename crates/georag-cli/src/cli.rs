@@ -1,5 +1,3 @@
-//! CLI argument parsing
-
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -94,7 +92,8 @@ pub struct InitArgs {
 
 #[derive(Parser, Debug)]
 pub struct AddArgs {
-    /// Path to the dataset file (GeoJSON, Shapefile, etc.)
+    /// Path to the dataset file or directory (GeoJSON, Shapefile, GPX, KML, PDF, DOCX)
+    /// If a directory is provided, all supported files will be processed
     pub path: PathBuf,
 
     /// Dataset name (defaults to filename)
@@ -108,6 +107,27 @@ pub struct AddArgs {
     /// Interactive mode - prompt for settings
     #[arg(long, short = 'i')]
     pub interactive: bool,
+
+    /// GPX track type filter (tracks, routes, waypoints, or all)
+    /// Only applicable for GPX files
+    #[arg(long, value_name = "TYPE")]
+    pub track_type: Option<String>,
+
+    /// KML folder path to extract (e.g., "Parent/Child")
+    /// Only applicable for KML files
+    #[arg(long, value_name = "PATH")]
+    pub folder: Option<String>,
+
+    /// Associate geometry with document (for PDF, DOCX)
+    /// Can be a GeoJSON geometry string or path to a GeoJSON file
+    /// Example: --geometry '{"type":"Point","coordinates":[-122.4,47.6]}'
+    /// Example: --geometry location.geojson
+    #[arg(long, value_name = "GEOMETRY")]
+    pub geometry: Option<String>,
+
+    /// Process files in parallel (for batch operations)
+    #[arg(long, default_value = "true")]
+    pub parallel: bool,
 }
 
 #[derive(Parser, Debug)]

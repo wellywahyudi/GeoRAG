@@ -1,7 +1,7 @@
 //! Test format metadata serialization and deserialization
 
-use georag_core::models::dataset::{Dataset, DatasetId, FormatMetadata, GeometryType};
 use chrono::Utc;
+use georag_core::models::dataset::{Dataset, DatasetId, FormatMetadata, GeometryType};
 use std::path::PathBuf;
 
 #[test]
@@ -54,7 +54,7 @@ fn test_format_metadata_with_all_fields() {
 
     // Test serialization
     let json = serde_json::to_string(&format).expect("Failed to serialize");
-    
+
     // Test deserialization
     let deserialized: FormatMetadata = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.format_name, "GeoPackage");
@@ -80,7 +80,7 @@ fn test_format_metadata_document_format() {
 
     // Test serialization
     let json = serde_json::to_string(&format).expect("Failed to serialize");
-    
+
     // Test deserialization
     let deserialized: FormatMetadata = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.format_name, "PDF");
@@ -104,7 +104,7 @@ fn test_format_metadata_docx_format() {
 
     // Test serialization
     let json = serde_json::to_string(&format).expect("Failed to serialize");
-    
+
     // Test deserialization
     let deserialized: FormatMetadata = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.format_name, "DOCX");
@@ -117,7 +117,7 @@ fn test_format_metadata_docx_format() {
 fn test_format_metadata_with_spatial_association() {
     use georag_core::models::dataset::SpatialAssociation;
     use std::path::PathBuf;
-    
+
     // Create format metadata with spatial association
     let format = FormatMetadata {
         format_name: "PDF".to_string(),
@@ -136,23 +136,26 @@ fn test_format_metadata_with_spatial_association() {
 
     // Test serialization
     let json = serde_json::to_string(&format).expect("Failed to serialize");
-    
+
     // Test deserialization
     let deserialized: FormatMetadata = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.format_name, "PDF");
     assert!(deserialized.spatial_association.is_some());
-    
+
     let spatial_assoc = deserialized.spatial_association.unwrap();
     assert_eq!(spatial_assoc.source, "manual");
     assert_eq!(spatial_assoc.geometry_file, Some(PathBuf::from("/path/to/geometry.geojson")));
-    assert_eq!(spatial_assoc.description, Some("Manually associated with building location".to_string()));
+    assert_eq!(
+        spatial_assoc.description,
+        Some("Manually associated with building location".to_string())
+    );
 }
 
 #[test]
 fn test_feature_with_null_geometry() {
     use georag_core::models::query::{Feature, FeatureId};
     use std::collections::HashMap;
-    
+
     // Create a feature without geometry (document)
     let feature = Feature::without_geometry(
         FeatureId(1),
@@ -162,13 +165,13 @@ fn test_feature_with_null_geometry() {
         ]),
         4326,
     );
-    
+
     assert!(!feature.has_geometry());
     assert!(!feature.is_spatially_queryable());
-    
+
     // Test serialization
     let json = serde_json::to_string(&feature).expect("Failed to serialize");
-    
+
     // Test deserialization
     let deserialized: Feature = serde_json::from_str(&json).expect("Failed to deserialize");
     assert!(!deserialized.has_geometry());
@@ -179,28 +182,26 @@ fn test_feature_with_null_geometry() {
 fn test_feature_geometry_association() {
     use georag_core::models::query::{Feature, FeatureId};
     use std::collections::HashMap;
-    
+
     // Create a feature without geometry
     let mut feature = Feature::without_geometry(
         FeatureId(1),
-        HashMap::from([
-            ("content".to_string(), serde_json::json!("Document text")),
-        ]),
+        HashMap::from([("content".to_string(), serde_json::json!("Document text"))]),
         4326,
     );
-    
+
     assert!(!feature.has_geometry());
-    
+
     // Associate geometry
     let geometry = serde_json::json!({
         "type": "Point",
         "coordinates": [-122.4, 47.6]
     });
     feature.associate_geometry(geometry);
-    
+
     assert!(feature.has_geometry());
     assert!(feature.is_spatially_queryable());
-    
+
     // Verify geometry is correct
     let geom = feature.geometry.as_ref().unwrap();
     assert_eq!(geom["type"], "Point");

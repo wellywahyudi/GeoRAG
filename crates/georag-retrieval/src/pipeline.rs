@@ -1,5 +1,3 @@
-//! Retrieval pipeline implementation
-
 use georag_core::error::{GeoragError, Result};
 use georag_core::models::{ChunkId, ScoredResult, TextChunk};
 use georag_llm::ports::Embedder;
@@ -70,9 +68,7 @@ where
 
         // Build explanation if requested
         let explanation = if plan.explain {
-            let ranking_details = self
-                .build_ranking_details(&ranked_results, &sources)
-                .await?;
+            let ranking_details = self.build_ranking_details(&ranked_results, &sources).await?;
             Some(QueryExplanation {
                 spatial_phase: spatial_explanation.clone(),
                 semantic_phase: semantic_explanation.clone(),
@@ -105,7 +101,9 @@ where
         &self,
         plan: &QueryPlan,
     ) -> Result<(Vec<ChunkId>, SpatialPhaseExplanation)> {
-        let (chunk_ids, features_evaluated, features_matched) = if let Some(filter) = &plan.spatial_filter {
+        let (chunk_ids, features_evaluated, features_matched) = if let Some(filter) =
+            &plan.spatial_filter
+        {
             // Apply spatial filter
             let features = self.spatial_store.spatial_query(filter).await?;
             let features_matched = features.len();
@@ -116,17 +114,12 @@ where
 
             // Extract chunk IDs from features with spatial references
             let chunks = self.document_store.get_chunks(&all_chunk_ids).await?;
-            let feature_ids: std::collections::HashSet<_> =
-                features.iter().map(|f| f.id).collect();
+            let feature_ids: std::collections::HashSet<_> = features.iter().map(|f| f.id).collect();
 
             let filtered_chunk_ids: Vec<ChunkId> = chunks
                 .into_iter()
                 .filter(|chunk| {
-                    chunk
-                        .spatial_ref
-                        .as_ref()
-                        .map(|fid| feature_ids.contains(fid))
-                        .unwrap_or(false)
+                    chunk.spatial_ref.as_ref().map(|fid| feature_ids.contains(fid)).unwrap_or(false)
                 })
                 .map(|chunk| chunk.id)
                 .collect();
@@ -145,11 +138,7 @@ where
                 .as_ref()
                 .map(|f| format!("{:?}", f.predicate))
                 .unwrap_or_else(|| "None".to_string()),
-            crs: plan
-                .spatial_filter
-                .as_ref()
-                .map(|f| f.crs)
-                .unwrap_or(4326),
+            crs: plan.spatial_filter.as_ref().map(|f| f.crs).unwrap_or(4326),
             features_evaluated,
             features_matched,
             distance_threshold: plan
@@ -174,26 +163,19 @@ where
 
         // Generate query embedding
         let query_embeddings = self.embedder.embed(&[&plan.text_query])?;
-        let query_embedding = query_embeddings
-            .into_iter()
-            .next()
-            .ok_or_else(|| GeoragError::EmbedderUnavailable {
+        let query_embedding = query_embeddings.into_iter().next().ok_or_else(|| {
+            GeoragError::EmbedderUnavailable {
                 reason: "Failed to generate query embedding".to_string(),
                 remediation: "Check embedder configuration".to_string(),
-            })?;
+            }
+        })?;
 
         // Calculate query norm
-        let query_norm = query_embedding
-            .iter()
-            .map(|x| x * x)
-            .sum::<f32>()
-            .sqrt();
+        let query_norm = query_embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
 
         // Perform similarity search
-        let mut results = self
-            .vector_store
-            .similarity_search(&query_embedding, plan.top_k, None)
-            .await?;
+        let mut results =
+            self.vector_store.similarity_search(&query_embedding, plan.top_k, None).await?;
 
         // Filter to only include candidates from spatial phase
         let candidate_set: std::collections::HashSet<_> = candidates.iter().copied().collect();
@@ -226,7 +208,7 @@ where
             if let Some(chunk) = chunk_map.get(&result.chunk_id) {
                 sources.push(SourceReference {
                     chunk_id: chunk.id,
-                    feature_id: chunk.spatial_ref.clone(),
+                    feature_id: chunk.spatial_ref,
                     document_path: chunk.source.document_path.clone(),
                     page: chunk.source.page,
                     excerpt: chunk.content.clone(),
@@ -281,11 +263,8 @@ where
             return Ok("No relevant information found.".to_string());
         }
 
-        let context: Vec<String> = sources
-            .iter()
-            .take(3)
-            .map(|s| format!("- {}", s.excerpt))
-            .collect();
+        let context: Vec<String> =
+            sources.iter().take(3).map(|s| format!("- {}", s.excerpt)).collect();
 
         Ok(format!(
             "Based on the query '{}', here are the relevant findings:\n\n{}",

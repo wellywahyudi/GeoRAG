@@ -1,16 +1,12 @@
-//! PDF format reader implementation
-//!
-//! This module provides text extraction from PDF documents using the pdf-extract crate.
-//! PDFs are treated as documents without inherent geometry, but can be associated with
-//! spatial locations through external metadata.
-
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::Path;
 
 use crate::error::{GeoragError, Result};
-use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
 use crate::formats::validation::FormatValidator;
+use crate::formats::{
+    FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation,
+};
 
 /// PDF format reader
 pub struct PdfReader;
@@ -19,8 +15,8 @@ pub struct PdfReader;
 impl FormatReader for PdfReader {
     async fn read(&self, path: &Path) -> Result<FormatDataset> {
         // Extract text from PDF
-        let text = pdf_extract::extract_text(path)
-            .map_err(|e| GeoragError::DocumentExtraction {
+        let text =
+            pdf_extract::extract_text(path).map_err(|e| GeoragError::DocumentExtraction {
                 format: "PDF".to_string(),
                 reason: format!("Failed to extract text: {}", e),
             })?;
@@ -38,11 +34,7 @@ impl FormatReader for PdfReader {
         let word_count = text.split_whitespace().count();
 
         // Get dataset name from filename
-        let name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unnamed")
-            .to_string();
+        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed").to_string();
 
         // Create a single feature with document content
         let feature = FormatFeature {
@@ -68,7 +60,7 @@ impl FormatReader for PdfReader {
                 extraction_method: Some("pdf-extract".to_string()),
                 spatial_association: None,
             },
-            crs: 4326, // Default to WGS84 for documents
+            crs: 4326,
             features: vec![feature],
         })
     }
@@ -82,7 +74,6 @@ impl FormatReader for PdfReader {
     }
 
     async fn validate(&self, path: &Path) -> Result<FormatValidation> {
-        // Basic file validation
         let mut validation = FormatValidator::validate_file_exists(path);
         if !validation.is_valid() {
             return Ok(validation);
@@ -93,7 +84,8 @@ impl FormatReader for PdfReader {
             Ok(text) => {
                 if text.trim().is_empty() {
                     validation.warnings.push(
-                        "PDF contains no extractable text (may be image-based or empty)".to_string()
+                        "PDF contains no extractable text (may be image-based or empty)"
+                            .to_string(),
                     );
                 }
             }
@@ -108,13 +100,10 @@ impl FormatReader for PdfReader {
 
 impl PdfReader {
     /// Estimate page count from extracted text
-    ///
-    /// This is a heuristic based on form feed characters and text length.
-    /// The pdf-extract crate doesn't provide direct page count access.
     fn estimate_page_count(&self, text: &str) -> usize {
         // Count form feed characters (page breaks)
         let form_feeds = text.chars().filter(|&c| c == '\x0C').count();
-        
+
         if form_feeds > 0 {
             // If we have form feeds, use them as page indicators
             form_feeds + 1
@@ -133,19 +122,12 @@ impl PdfReader {
     /// - Preserve paragraph boundaries where possible
     /// - Include overlap between chunks for context continuity
     ///
-    /// # Arguments
-    /// * `text` - The full text to chunk
-    /// * `chunk_size` - Target number of words per chunk (default: 500)
-    /// * `overlap` - Number of words to overlap between chunks (default: 50)
-    ///
-    /// # Returns
-    /// Vector of text chunks with metadata
     pub fn chunk_text(&self, text: &str, chunk_size: usize, overlap: usize) -> Vec<TextChunk> {
         let mut chunks = Vec::new();
-        
+
         // Split into paragraphs (double newline or form feed)
         let paragraphs: Vec<&str> = text
-            .split(|c| c == '\x0C')
+            .split('\x0C')
             .flat_map(|section| section.split("\n\n"))
             .filter(|p| !p.trim().is_empty())
             .collect();
@@ -165,7 +147,6 @@ impl PdfReader {
 
             // If adding this paragraph would exceed chunk size, finalize current chunk
             if current_word_count > 0 && current_word_count + word_count > chunk_size {
-                // Prepare overlap for next chunk (before storing the chunk)
                 let overlap_words: Vec<String> = current_chunk
                     .split_whitespace()
                     .rev()
@@ -188,9 +169,9 @@ impl PdfReader {
                 // Start new chunk with overlap
                 current_chunk = overlap_words.join(" ");
                 current_word_count = overlap_words.len();
-                
+
                 if !current_chunk.is_empty() {
-                    current_chunk.push_str(" ");
+                    current_chunk.push(' ');
                 }
             }
 
@@ -221,13 +202,13 @@ impl PdfReader {
 pub struct TextChunk {
     /// Index of this chunk in the document
     pub index: usize,
-    
+
     /// The text content of this chunk
     pub text: String,
-    
+
     /// Number of words in this chunk
     pub word_count: usize,
-    
+
     /// Character offset where this chunk starts in the original document
     pub start_offset: usize,
 }
@@ -277,10 +258,10 @@ mod tests {
         let paragraph = "This is a test paragraph with some words. ".repeat(10);
         let text = format!("{}\n\n{}\n\n{}", paragraph, paragraph, paragraph);
         let chunks = reader.chunk_text(&text, 50, 10);
-        
+
         // Should create multiple chunks
         assert!(chunks.len() > 1, "Expected multiple chunks, got {}", chunks.len());
-        
+
         // Each chunk should have an index
         for (i, chunk) in chunks.iter().enumerate() {
             assert_eq!(chunk.index, i);
@@ -292,10 +273,10 @@ mod tests {
         let reader = PdfReader;
         let text = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.";
         let chunks = reader.chunk_text(&text, 10, 2);
-        
+
         // Should have at least one chunk
         assert!(!chunks.is_empty());
-        
+
         // Chunks should contain paragraph content
         let all_text: String = chunks.iter().map(|c| c.text.as_str()).collect::<Vec<_>>().join(" ");
         assert!(all_text.contains("First paragraph"));
@@ -306,7 +287,7 @@ mod tests {
         let reader = PdfReader;
         let text = "";
         let chunks = reader.chunk_text(text, 100, 10);
-        
+
         // Empty text should produce no chunks
         assert_eq!(chunks.len(), 0);
     }
@@ -316,7 +297,7 @@ mod tests {
         let reader = PdfReader;
         let text = "Short text that fits in one chunk.";
         let chunks = reader.chunk_text(text, 100, 10);
-        
+
         // Should produce exactly one chunk
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].index, 0);
@@ -329,21 +310,18 @@ mod tests {
         // Create text with clear paragraph boundaries
         let text = format!("{}\n\n{}", "word ".repeat(60), "word ".repeat(60));
         let chunks = reader.chunk_text(&text, 50, 10);
-        
+
         // Should create multiple chunks with overlap
         assert!(chunks.len() >= 2);
-        
+
         // Verify overlap exists (second chunk should start with some words from first chunk)
         if chunks.len() >= 2 {
             let first_chunk_words: Vec<&str> = chunks[0].text.split_whitespace().collect();
             let second_chunk_words: Vec<&str> = chunks[1].text.split_whitespace().collect();
-            
+
             // Second chunk should start with some words that appeared at end of first chunk
             assert!(first_chunk_words.len() > 0);
             assert!(second_chunk_words.len() > 0);
         }
     }
-
-    // Note: Integration tests with actual PDF files would require test fixtures
-    // These would be added in the integration test suite
 }

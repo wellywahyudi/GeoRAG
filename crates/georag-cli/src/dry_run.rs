@@ -1,9 +1,3 @@
-//! Dry-run mode utilities
-//!
-//! This module provides utilities for implementing dry-run mode across commands.
-//! Dry-run mode displays planned actions without executing them, ensuring no state
-//! modification occurs.
-
 use crate::output::OutputWriter;
 use serde::Serialize;
 
@@ -24,8 +18,6 @@ pub enum ActionType {
     WriteFile,
     CopyFile,
     ModifyFile,
-    DeleteFile,
-    DeleteDirectory,
 }
 
 impl PlannedAction {
@@ -41,12 +33,6 @@ impl PlannedAction {
     /// Add a detail to the planned action
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.details.push(detail.into());
-        self
-    }
-
-    /// Add multiple details to the planned action
-    pub fn with_details(mut self, details: Vec<String>) -> Self {
-        self.details.extend(details);
         self
     }
 }

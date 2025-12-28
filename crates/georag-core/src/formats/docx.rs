@@ -1,16 +1,12 @@
-//! DOCX format reader implementation
-//!
-//! This module provides text extraction from Microsoft Word DOCX documents using the docx-rs crate.
-//! DOCX files are treated as documents without inherent geometry, but can be associated with
-//! spatial locations through external metadata.
-
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::Path;
 
 use crate::error::{GeoragError, Result};
-use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
 use crate::formats::validation::FormatValidator;
+use crate::formats::{
+    FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation,
+};
 
 /// DOCX format reader
 pub struct DocxReader;
@@ -19,18 +15,16 @@ pub struct DocxReader;
 impl FormatReader for DocxReader {
     async fn read(&self, path: &Path) -> Result<FormatDataset> {
         // Read the DOCX file into memory
-        let bytes = std::fs::read(path)
-            .map_err(|e| GeoragError::DocumentExtraction {
-                format: "DOCX".to_string(),
-                reason: format!("Failed to read file: {}", e),
-            })?;
+        let bytes = std::fs::read(path).map_err(|e| GeoragError::DocumentExtraction {
+            format: "DOCX".to_string(),
+            reason: format!("Failed to read file: {}", e),
+        })?;
 
         // Parse the DOCX document
-        let docx = docx_rs::read_docx(&bytes)
-            .map_err(|e| GeoragError::DocumentExtraction {
-                format: "DOCX".to_string(),
-                reason: format!("Failed to parse DOCX: {}", e),
-            })?;
+        let docx = docx_rs::read_docx(&bytes).map_err(|e| GeoragError::DocumentExtraction {
+            format: "DOCX".to_string(),
+            reason: format!("Failed to parse DOCX: {}", e),
+        })?;
 
         // Extract text from paragraphs and tables
         let mut paragraphs = Vec::new();
@@ -66,11 +60,7 @@ impl FormatReader for DocxReader {
         let word_count = full_text.split_whitespace().count();
 
         // Get dataset name from filename
-        let name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unnamed")
-            .to_string();
+        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed").to_string();
 
         // Create a single feature with document content
         let feature = FormatFeature {
@@ -81,7 +71,10 @@ impl FormatReader for DocxReader {
                 ("format".to_string(), serde_json::Value::String("DOCX".to_string())),
                 ("content".to_string(), serde_json::Value::String(full_text.clone())),
                 ("word_count".to_string(), serde_json::Value::Number(word_count.into())),
-                ("paragraph_count".to_string(), serde_json::Value::Number(paragraphs.len().into())),
+                (
+                    "paragraph_count".to_string(),
+                    serde_json::Value::Number(paragraphs.len().into()),
+                ),
                 ("table_count".to_string(), serde_json::Value::Number(table_count.into())),
             ]),
         };
@@ -97,7 +90,7 @@ impl FormatReader for DocxReader {
                 extraction_method: Some("docx-rs".to_string()),
                 spatial_association: None,
             },
-            crs: 4326, // Default to WGS84 for documents
+            crs: 4326, // Default to WGS84 (EPSG:4326) for documents without inherent geometry
             features: vec![feature],
         })
     }
@@ -124,12 +117,17 @@ impl FormatReader for DocxReader {
                     Ok(docx) => {
                         // Check if document has any content
                         let has_content = docx.document.children.iter().any(|child| {
-                            matches!(child, docx_rs::DocumentChild::Paragraph(_) | docx_rs::DocumentChild::Table(_))
+                            matches!(
+                                child,
+                                docx_rs::DocumentChild::Paragraph(_)
+                                    | docx_rs::DocumentChild::Table(_)
+                            )
                         });
-                        
+
                         if !has_content {
                             validation.warnings.push(
-                                "DOCX appears to be empty (no paragraphs or tables found)".to_string()
+                                "DOCX appears to be empty (no paragraphs or tables found)"
+                                    .to_string(),
                             );
                         }
                     }
@@ -150,7 +148,8 @@ impl FormatReader for DocxReader {
 impl DocxReader {
     /// Extract text from a paragraph
     fn extract_paragraph_text(&self, paragraph: &docx_rs::Paragraph) -> String {
-        paragraph.children
+        paragraph
+            .children
             .iter()
             .filter_map(|child| {
                 if let docx_rs::ParagraphChild::Run(run) = child {
@@ -181,14 +180,15 @@ impl DocxReader {
     /// Extract text from a table
     fn extract_table_text(&self, table: &docx_rs::Table) -> String {
         let mut table_text = String::new();
-        
+
         for row_child in &table.rows {
             let docx_rs::TableChild::TableRow(row) = row_child;
             let mut row_text = Vec::new();
-            
+
             for cell_child in &row.cells {
                 let docx_rs::TableRowChild::TableCell(cell) = cell_child;
-                let cell_text = cell.children
+                let cell_text = cell
+                    .children
                     .iter()
                     .filter_map(|child| {
                         if let docx_rs::TableCellContent::Paragraph(p) = child {
@@ -199,18 +199,18 @@ impl DocxReader {
                     })
                     .collect::<Vec<_>>()
                     .join(" ");
-                
+
                 if !cell_text.trim().is_empty() {
                     row_text.push(cell_text);
                 }
             }
-            
+
             if !row_text.is_empty() {
                 table_text.push_str(&row_text.join(" | "));
                 table_text.push('\n');
             }
         }
-        
+
         table_text
     }
 }
@@ -230,7 +230,4 @@ mod tests {
         let reader = DocxReader;
         assert_eq!(reader.format_name(), "DOCX");
     }
-
-    // Note: Integration tests with actual DOCX files would require test fixtures
-    // These would be added in the integration test suite
 }

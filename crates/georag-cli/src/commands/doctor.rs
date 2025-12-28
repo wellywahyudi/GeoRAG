@@ -1,13 +1,11 @@
-//! Doctor command - health checks and diagnostics
-
-use crate::auto_detect::{PostgresDetection, OllamaDetection, detect_workspace_issues};
+use crate::auto_detect::{detect_workspace_issues, OllamaDetection, PostgresDetection};
 use crate::cli::DoctorArgs;
 use crate::config;
 use crate::output::OutputWriter;
 use anyhow::Result;
 use console::style;
 
-pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
+pub fn execute(args: DoctorArgs, _output: &OutputWriter) -> Result<()> {
     println!("\n{}", style("GeoRAG Health Check").bold().underlined());
     println!("{}", style("═".repeat(60)).dim());
     println!();
@@ -59,7 +57,11 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
                             println!("{} Datasets: No datasets registered", style("⚠").yellow());
                             println!("  → Run: georag add dataset.geojson");
                         } else {
-                            println!("{} Datasets: {} datasets registered", style("✓").green(), datasets.len());
+                            println!(
+                                "{} Datasets: {} datasets registered",
+                                style("✓").green(),
+                                datasets.len()
+                            );
                             checks_passed += 1;
                         }
                     }
@@ -91,12 +93,12 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
 
     // Check PostgreSQL
     let pg_detection = PostgresDetection::detect();
-    
+
     total_checks += 1;
     if pg_detection.installed {
         println!("{} PostgreSQL: Installed", style("✓").green());
         checks_passed += 1;
-        
+
         if let Some(ref version) = pg_detection.version {
             if args.verbose {
                 println!("  Version: {}", version);
@@ -112,7 +114,7 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
     if pg_detection.running {
         println!("{} PostgreSQL: Running", style("✓").green());
         checks_passed += 1;
-        
+
         if let Some(ref url) = pg_detection.suggested_url {
             if args.verbose {
                 println!("  Suggested URL: {}", url);
@@ -129,10 +131,10 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
     if let Ok(url) = std::env::var("DATABASE_URL") {
         println!("{} DATABASE_URL: Set", style("✓").green());
         checks_passed += 1;
-        
+
         if args.verbose {
             // Hide password
-            let display_url = url.split('@').last().unwrap_or(&url);
+            let display_url = url.split('@').next_back().unwrap_or(&url);
             println!("  Value: ...@{}", display_url);
         }
     } else {
@@ -146,7 +148,7 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
 
     // Check Ollama
     let ollama_detection = OllamaDetection::detect();
-    
+
     total_checks += 1;
     if ollama_detection.installed {
         println!("{} Ollama: Installed", style("✓").green());
@@ -160,7 +162,7 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
     if ollama_detection.running {
         println!("{} Ollama: Running", style("✓").green());
         checks_passed += 1;
-        
+
         if args.verbose && !ollama_detection.available_models.is_empty() {
             println!("  Available models:");
             for model in &ollama_detection.available_models {
@@ -185,7 +187,7 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
     // Summary
     println!();
     println!("{}", style("═".repeat(60)).dim());
-    
+
     let percentage = (checks_passed as f64 / total_checks as f64 * 100.0) as usize;
     let status_icon = if percentage >= 80 {
         style("✓").green()
@@ -202,7 +204,10 @@ pub fn execute(args: DoctorArgs, output: &OutputWriter) -> Result<()> {
     println!();
 
     if checks_passed < total_checks {
-        println!("{}", style("Some issues were found. Follow the suggestions above to fix them.").yellow());
+        println!(
+            "{}",
+            style("Some issues were found. Follow the suggestions above to fix them.").yellow()
+        );
     } else {
         println!("{}", style("All checks passed! Your GeoRAG installation is healthy.").green());
     }

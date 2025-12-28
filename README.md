@@ -213,6 +213,25 @@ The GeoRAG workspace is organized into focused crates:
 - Ollama (for embedding generation)
 - PostgreSQL with PostGIS (optional, for persistent storage)
 
+### Development
+
+### Code Formatting
+
+This project uses `rustfmt` for consistent code formatting:
+
+```bash
+# Format all code
+make fmt
+
+# Check formatting
+make fmt-check
+
+# Run all checks (format, lint, test)
+make check
+```
+
+See [FORMATTING.md](FORMATTING.md) for detailed formatting guidelines.
+
 ### Building
 
 ```bash

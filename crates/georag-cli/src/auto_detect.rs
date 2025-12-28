@@ -1,4 +1,4 @@
-//! Auto-detection utilities for smart defaults
+#![allow(dead_code)]
 
 use anyhow::Result;
 use std::path::Path;
@@ -32,16 +32,13 @@ impl PostgresDetection {
     }
 
     fn is_installed() -> bool {
-        Command::new("psql")
-            .arg("--version")
-            .output()
-            .is_ok()
+        Command::new("psql").arg("--version").output().is_ok()
     }
 
     fn is_running() -> bool {
         // Try to connect to default PostgreSQL
         Command::new("psql")
-            .args(&["-h", "localhost", "-U", "postgres", "-c", "SELECT 1"])
+            .args(["-h", "localhost", "-U", "postgres", "-c", "SELECT 1"])
             .env("PGPASSWORD", "")
             .output()
             .map(|output| output.status.success())
@@ -60,7 +57,7 @@ impl PostgresDetection {
     fn suggest_connection_url() -> String {
         // Check common locations
         let user = std::env::var("USER").unwrap_or_else(|_| "postgres".to_string());
-        
+
         // Try localhost first
         format!("postgresql://{}@localhost:5432/georag", user)
     }
@@ -78,11 +75,7 @@ impl PostgresDetection {
         let postgis = Self::check_extension(database_url, "postgis");
         let pgvector = Self::check_extension(database_url, "vector");
 
-        ExtensionCheck {
-            postgis,
-            pgvector,
-            can_check: true,
-        }
+        ExtensionCheck { postgis, pgvector, can_check: true }
     }
 
     fn check_extension(database_url: &str, extension: &str) -> bool {
@@ -155,28 +148,24 @@ impl DatasetDetection {
     }
 
     fn suggest_name(path: &Path) -> String {
-        path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("dataset")
-            .to_string()
+        path.file_stem().and_then(|s| s.to_str()).unwrap_or("dataset").to_string()
     }
 
     fn analyze_geojson(path: &Path) -> Result<(Option<usize>, Option<u32>, Option<String>)> {
         let content = std::fs::read_to_string(path)?;
         let geojson: serde_json::Value = serde_json::from_str(&content)?;
 
-        let feature_count = if let Some(features) = geojson.get("features").and_then(|f| f.as_array()) {
-            Some(features.len())
-        } else {
-            None
-        };
+        let feature_count = geojson
+            .get("features")
+            .and_then(|f| f.as_array())
+            .map(|features| features.len());
 
         let crs = geojson
             .get("crs")
             .and_then(|crs| crs.get("properties"))
             .and_then(|props| props.get("name"))
             .and_then(|name| name.as_str())
-            .and_then(|name| name.split(':').last())
+            .and_then(|name| name.split(':').next_back())
             .and_then(|code| code.parse::<u32>().ok())
             .or(Some(4326)); // Default to WGS84
 
@@ -210,18 +199,11 @@ impl OllamaDetection {
             Vec::new()
         };
 
-        Self {
-            installed,
-            running,
-            available_models,
-        }
+        Self { installed, running, available_models }
     }
 
     fn is_installed() -> bool {
-        Command::new("ollama")
-            .arg("--version")
-            .output()
-            .is_ok()
+        Command::new("ollama").arg("--version").output().is_ok()
     }
 
     fn is_running() -> bool {

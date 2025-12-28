@@ -1,45 +1,53 @@
-//! Format abstraction layer for multi-format support
-//!
-//! This module provides a trait-based abstraction for reading different file formats.
-//! Each format implements the `FormatReader` trait, and the `FormatRegistry` manages
-//! format detection and dispatching to appropriate readers.
-
 use async_trait::async_trait;
+use std::collections::HashMap;
 use std::path::Path;
 
 use crate::error::Result;
 
+pub mod docx;
 pub mod geojson;
-pub mod shapefile;
 pub mod gpx;
 pub mod kml;
 pub mod pdf;
-pub mod docx;
+pub mod shapefile;
 pub mod validation;
+
+/// Format-specific options for reading datasets
+#[derive(Debug, Clone, Default)]
+pub struct FormatOptions {
+    pub options: HashMap<String, String>,
+}
+
+impl FormatOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn with_option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.options.insert(key.into(), value.into());
+        self
+    }
+    pub fn get(&self, key: &str) -> Option<&String> {
+        self.options.get(key)
+    }
+}
 
 /// Format reader trait that all format implementations must implement
 #[async_trait]
 pub trait FormatReader: Send + Sync {
     /// Read a dataset from the given path
-    ///
-    /// # Arguments
-    /// * `path` - Path to the file to read
-    ///
-    /// # Returns
-    /// A `Dataset` containing the parsed data
     async fn read(&self, path: &Path) -> Result<FormatDataset>;
 
+    /// Read a dataset with format-specific options
+    async fn read_with_options(
+        &self,
+        path: &Path,
+        _options: &FormatOptions,
+    ) -> Result<FormatDataset> {
+        // Default implementation: ignore options and read normally
+        self.read(path).await
+    }
+
     /// Read a dataset with an associated geometry
-    ///
-    /// This is primarily used for document formats (PDF, DOCX) that don't have
-    /// inherent spatial information but can be associated with a location.
-    ///
-    /// # Arguments
-    /// * `path` - Path to the file to read
-    /// * `geometry` - GeoJSON-like geometry to associate with the document
-    ///
-    /// # Returns
-    /// A `Dataset` with features that have the associated geometry
     async fn read_with_geometry(
         &self,
         path: &Path,
@@ -47,21 +55,21 @@ pub trait FormatReader: Send + Sync {
     ) -> Result<FormatDataset> {
         // Default implementation: read normally and associate geometry
         let mut dataset = self.read(path).await?;
-        
+
         // Associate geometry with all features
         for feature in &mut dataset.features {
             if feature.geometry.is_none() {
                 feature.geometry = Some(geometry.clone());
             }
         }
-        
+
         // Update metadata to indicate spatial association
         dataset.format_metadata.spatial_association = Some(SpatialAssociationInfo {
             source: "manual".to_string(),
             geometry_file: None,
             description: Some("Geometry manually associated with document".to_string()),
         });
-        
+
         Ok(dataset)
     }
 
@@ -72,11 +80,7 @@ pub trait FormatReader: Send + Sync {
     fn format_name(&self) -> &str;
 
     /// Validate file structure without full read (optional)
-    ///
-    /// This allows format readers to perform quick validation checks
-    /// before attempting a full read operation.
     async fn validate(&self, _path: &Path) -> Result<FormatValidation> {
-        // Default implementation: no validation errors or warnings
         Ok(FormatValidation::default())
     }
 }
@@ -86,7 +90,7 @@ pub trait FormatReader: Send + Sync {
 pub struct FormatValidation {
     /// Validation errors that prevent reading
     pub errors: Vec<String>,
-    
+
     /// Warnings that don't prevent reading but indicate potential issues
     pub warnings: Vec<String>,
 }
@@ -104,19 +108,17 @@ impl FormatValidation {
 }
 
 /// Dataset representation returned by format readers
-///
-/// This is a temporary structure that will be converted to the core Dataset model
 #[derive(Debug, Clone)]
 pub struct FormatDataset {
     /// Dataset name
     pub name: String,
-    
+
     /// Format-specific metadata
     pub format_metadata: FormatMetadata,
-    
+
     /// CRS EPSG code
     pub crs: u32,
-    
+
     /// Features extracted from the format
     pub features: Vec<FormatFeature>,
 }
@@ -126,22 +128,22 @@ pub struct FormatDataset {
 pub struct FormatMetadata {
     /// Format name (e.g., "Shapefile", "GeoJSON", "PDF")
     pub format_name: String,
-    
+
     /// Optional format version
     pub format_version: Option<String>,
-    
+
     /// Layer name for multi-layer formats (e.g., GeoPackage)
     pub layer_name: Option<String>,
-    
+
     /// Page count for document formats
     pub page_count: Option<usize>,
-    
+
     /// Paragraph count for document formats
     pub paragraph_count: Option<usize>,
-    
+
     /// Extraction method used (e.g., "GDAL", "pdf-extract")
     pub extraction_method: Option<String>,
-    
+
     /// Spatial association metadata for documents
     pub spatial_association: Option<SpatialAssociationInfo>,
 }
@@ -151,10 +153,10 @@ pub struct FormatMetadata {
 pub struct SpatialAssociationInfo {
     /// Source of the spatial association (e.g., "manual", "file", "geocoding")
     pub source: String,
-    
+
     /// Path to the geometry file if association came from a file
     pub geometry_file: Option<std::path::PathBuf>,
-    
+
     /// Description of the association
     pub description: Option<String>,
 }
@@ -164,18 +166,15 @@ pub struct SpatialAssociationInfo {
 pub struct FormatFeature {
     /// Feature identifier
     pub id: String,
-    
+
     /// Geometry (GeoJSON-like structure), None for documents without geometry
     pub geometry: Option<serde_json::Value>,
-    
+
     /// Feature properties
     pub properties: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// Central registry for format readers
-///
-/// The registry maintains a collection of format readers and provides
-/// format detection based on file extensions.
 pub struct FormatRegistry {
     readers: Vec<Box<dyn FormatReader>>,
 }
@@ -183,9 +182,7 @@ pub struct FormatRegistry {
 impl FormatRegistry {
     /// Create a new empty format registry
     pub fn new() -> Self {
-        Self {
-            readers: Vec::new(),
-        }
+        Self { readers: Vec::new() }
     }
 
     /// Register a format reader
@@ -194,20 +191,13 @@ impl FormatRegistry {
     }
 
     /// Detect format and return appropriate reader
-    ///
-    /// # Arguments
-    /// * `path` - Path to the file
-    ///
-    /// # Returns
-    /// Reference to the format reader that supports this file extension
     pub fn detect_format(&self, path: &Path) -> Result<&dyn FormatReader> {
-        let extension = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .ok_or_else(|| crate::error::GeoragError::UnsupportedFormat {
+        let extension = path.extension().and_then(|e| e.to_str()).ok_or_else(|| {
+            crate::error::GeoragError::UnsupportedFormat {
                 extension: "none".to_string(),
                 supported: self.supported_formats(),
-            })?;
+            }
+        })?;
 
         self.readers
             .iter()
@@ -291,7 +281,7 @@ mod tests {
             extensions: vec!["json", "geojson"],
             name: "GeoJSON",
         }));
-        
+
         assert_eq!(registry.readers().len(), 1);
         assert_eq!(registry.supported_formats(), vec!["json", "geojson"]);
     }

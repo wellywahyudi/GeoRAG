@@ -1,5 +1,3 @@
-//! Geospatial models
-
 use geo::Geometry as GeoGeometry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,12 +10,8 @@ pub struct Crs {
 }
 
 impl Crs {
-    /// Create a new CRS with EPSG code and name
     pub fn new(epsg: u32, name: impl Into<String>) -> Self {
-        Self {
-            epsg,
-            name: name.into(),
-        }
+        Self { epsg, name: name.into() }
     }
 
     /// WGS 84 (EPSG:4326)
@@ -172,13 +166,9 @@ impl Geometry {
 /// Spatial predicate for filtering
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SpatialPredicate {
-    /// Feature is within the filter geometry
     Within,
-    /// Feature intersects the filter geometry
     Intersects,
-    /// Feature contains the filter geometry
     Contains,
-    /// Feature is within the bounding box
     BoundingBox,
 }
 

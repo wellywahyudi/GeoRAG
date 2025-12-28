@@ -1,18 +1,15 @@
-//! Document processing utilities
-
-use crate::models::{ChunkId, ChunkMetadata, ChunkSource, TextChunk, FeatureId};
 use crate::error::{GeoragError, Result};
+use crate::models::{ChunkId, ChunkMetadata, ChunkSource, FeatureId, TextChunk};
 use std::collections::HashMap;
 
-/// Configuration for text chunking
 #[derive(Debug, Clone)]
 pub struct ChunkConfig {
     /// Minimum chunk size in characters
     pub min_size: usize,
-    
+
     /// Maximum chunk size in characters
     pub max_size: usize,
-    
+
     /// Overlap size in characters for context preservation
     pub overlap: usize,
 }
@@ -28,23 +25,7 @@ impl Default for ChunkConfig {
 }
 
 /// Chunk text into segments with configurable bounds and overlap
-///
-/// This function splits text into chunks respecting the configured min/max bounds
-/// and adds overlap between chunks for context preservation. No text is lost during
-/// chunking (concatenating chunks minus overlap reproduces the original text).
-///
-/// # Arguments
-/// * `text` - The text to chunk
-/// * `config` - Chunking configuration
-/// * `document_path` - Path to the source document
-///
-/// # Returns
-/// A vector of TextChunk instances
-pub fn chunk_text(
-    text: &str,
-    config: &ChunkConfig,
-    document_path: &str,
-) -> Result<Vec<TextChunk>> {
+pub fn chunk_text(text: &str, config: &ChunkConfig, document_path: &str) -> Result<Vec<TextChunk>> {
     if config.min_size > config.max_size {
         return Err(GeoragError::ConfigInvalid {
             key: "chunk_size".to_string(),
@@ -54,7 +35,7 @@ pub fn chunk_text(
             ),
         });
     }
-    
+
     if config.overlap >= config.max_size {
         return Err(GeoragError::ConfigInvalid {
             key: "chunk_overlap".to_string(),
@@ -64,26 +45,23 @@ pub fn chunk_text(
             ),
         });
     }
-    
+
     let mut chunks = Vec::new();
     let mut chunk_id = 0u64;
     let mut offset = 0;
-    
+
     while offset < text.len() {
-        // Calculate chunk end position
         let remaining = text.len() - offset;
         let chunk_size = if remaining <= config.max_size {
-            // Last chunk - take all remaining text
             remaining
         } else {
-            // Try to find a good break point (space, newline) near max_size
             let ideal_end = offset + config.max_size;
             find_break_point(text, offset, ideal_end, config.min_size)
         };
-        
+
         let chunk_end = offset + chunk_size;
         let content = text[offset..chunk_end].to_string();
-        
+
         let chunk = TextChunk {
             id: ChunkId(chunk_id),
             content,
@@ -98,69 +76,40 @@ pub fn chunk_text(
                 properties: HashMap::new(),
             },
         };
-        
+
         chunks.push(chunk);
         chunk_id += 1;
-        
-        // Move offset forward, accounting for overlap
+
         if chunk_end >= text.len() {
             break;
         }
-        
+
         offset = chunk_end.saturating_sub(config.overlap);
     }
-    
+
     Ok(chunks)
 }
 
 /// Find a good break point for chunking near the ideal position
-///
-/// Looks for whitespace or newlines near the ideal end position,
-/// preferring to break at natural boundaries.
 fn find_break_point(text: &str, start: usize, ideal_end: usize, min_size: usize) -> usize {
     let max_end = ideal_end.min(text.len());
-    
-    // Look backwards from ideal_end for a good break point
     let search_start = (start + min_size).max(start);
     let search_range = &text[search_start..max_end];
-    
-    // Find the last whitespace in the search range
+
     if let Some(last_space) = search_range.rfind(|c: char| c.is_whitespace()) {
-        // Return position relative to start
         return search_start - start + last_space + 1;
     }
-    
-    // No good break point found, use max_size
+
     max_end - start
 }
 
 /// Associate a text chunk with a spatial feature
-///
-/// This function creates a spatial reference linking a chunk to a geometry.
-/// The chunk's spatial_ref field is updated to point to the given feature.
-///
-/// # Arguments
-/// * `chunk` - The text chunk to associate
-/// * `feature_id` - The ID of the spatial feature to link to
-///
-/// # Returns
-/// A new TextChunk with the spatial reference set
 pub fn associate_chunk_with_geometry(mut chunk: TextChunk, feature_id: FeatureId) -> TextChunk {
     chunk.spatial_ref = Some(feature_id);
     chunk
 }
 
 /// Associate multiple chunks with a spatial feature
-///
-/// This is a convenience function for associating many chunks with the same geometry,
-/// which is common when processing documents that have a single associated location.
-///
-/// # Arguments
-/// * `chunks` - Vector of text chunks to associate
-/// * `feature_id` - The ID of the spatial feature to link to
-///
-/// # Returns
-/// A vector of TextChunks with spatial references set
 pub fn associate_chunks_with_geometry(
     chunks: Vec<TextChunk>,
     feature_id: FeatureId,
@@ -172,17 +121,6 @@ pub fn associate_chunks_with_geometry(
 }
 
 /// Chunk text and associate with geometry in one operation
-///
-/// This is a convenience function that combines text chunking with spatial association.
-///
-/// # Arguments
-/// * `text` - The text to chunk
-/// * `config` - Chunking configuration
-/// * `document_path` - Path to the source document
-/// * `feature_id` - The ID of the spatial feature to link to
-///
-/// # Returns
-/// A vector of TextChunk instances with spatial references
 pub fn chunk_text_with_geometry(
     text: &str,
     config: &ChunkConfig,
@@ -200,22 +138,18 @@ mod tests {
     #[test]
     fn test_chunk_text_basic() {
         let text = "This is a test document with some text that needs to be chunked.";
-        let config = ChunkConfig {
-            min_size: 10,
-            max_size: 30,
-            overlap: 5,
-        };
-        
+        let config = ChunkConfig { min_size: 10, max_size: 30, overlap: 5 };
+
         let chunks = chunk_text(text, &config, "test.txt").unwrap();
-        
+
         assert!(!chunks.is_empty());
-        
+
         // Verify all chunks are within bounds
         for chunk in &chunks {
             assert!(chunk.metadata.size >= config.min_size || chunk.metadata.size == text.len());
             assert!(chunk.metadata.size <= config.max_size);
         }
-        
+
         // Verify no text is lost (reconstruct original minus overlaps)
         let mut reconstructed = String::new();
         for (i, chunk) in chunks.iter().enumerate() {
@@ -227,7 +161,7 @@ mod tests {
                 reconstructed.push_str(&chunk.content[overlap_start..]);
             }
         }
-        
+
         assert_eq!(reconstructed, text);
     }
 
@@ -235,9 +169,9 @@ mod tests {
     fn test_chunk_text_short() {
         let text = "Short text.";
         let config = ChunkConfig::default();
-        
+
         let chunks = chunk_text(text, &config, "test.txt").unwrap();
-        
+
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].content, text);
     }
@@ -246,21 +180,17 @@ mod tests {
     fn test_chunk_text_empty() {
         let text = "";
         let config = ChunkConfig::default();
-        
+
         let chunks = chunk_text(text, &config, "test.txt").unwrap();
-        
+
         assert_eq!(chunks.len(), 0);
     }
 
     #[test]
     fn test_chunk_config_validation() {
         let text = "Some text";
-        let invalid_config = ChunkConfig {
-            min_size: 100,
-            max_size: 50,
-            overlap: 10,
-        };
-        
+        let invalid_config = ChunkConfig { min_size: 100, max_size: 50, overlap: 10 };
+
         let result = chunk_text(text, &invalid_config, "test.txt");
         assert!(result.is_err());
     }
@@ -268,19 +198,15 @@ mod tests {
     #[test]
     fn test_chunk_overlap() {
         let text = "AAAA BBBB CCCC DDDD EEEE FFFF";
-        let config = ChunkConfig {
-            min_size: 5,
-            max_size: 15,
-            overlap: 5,
-        };
-        
+        let config = ChunkConfig { min_size: 5, max_size: 15, overlap: 5 };
+
         let chunks = chunk_text(text, &config, "test.txt").unwrap();
-        
+
         // Verify overlap exists between consecutive chunks
         for i in 1..chunks.len() {
             let prev_chunk = &chunks[i - 1];
             let curr_chunk = &chunks[i];
-            
+
             // Current chunk should start before previous chunk ended
             assert!(curr_chunk.source.offset < prev_chunk.source.offset + prev_chunk.metadata.size);
         }
@@ -289,14 +215,10 @@ mod tests {
     #[test]
     fn test_chunk_ids_sequential() {
         let text = "A".repeat(500);
-        let config = ChunkConfig {
-            min_size: 50,
-            max_size: 100,
-            overlap: 10,
-        };
-        
+        let config = ChunkConfig { min_size: 50, max_size: 100, overlap: 10 };
+
         let chunks = chunk_text(&text, &config, "test.txt").unwrap();
-        
+
         for (i, chunk) in chunks.iter().enumerate() {
             assert_eq!(chunk.id.0, i as u64);
         }
@@ -307,37 +229,34 @@ mod tests {
         let text = "Test text";
         let config = ChunkConfig::default();
         let chunks = chunk_text(text, &config, "test.txt").unwrap();
-        
+
         assert_eq!(chunks.len(), 1);
         assert!(chunks[0].spatial_ref.is_none());
-        
+
         let feature_id = FeatureId(42);
         let associated = associate_chunk_with_geometry(chunks[0].clone(), feature_id);
-        
+
         assert_eq!(associated.spatial_ref, Some(feature_id));
         assert_eq!(associated.content, chunks[0].content);
     }
 
     #[test]
     fn test_associate_chunks_with_geometry() {
-        let text = "This is a longer text that will be split into multiple chunks for testing purposes.";
-        let config = ChunkConfig {
-            min_size: 10,
-            max_size: 30,
-            overlap: 5,
-        };
+        let text =
+            "This is a longer text that will be split into multiple chunks for testing purposes.";
+        let config = ChunkConfig { min_size: 10, max_size: 30, overlap: 5 };
         let chunks = chunk_text(text, &config, "test.txt").unwrap();
-        
+
         assert!(chunks.len() > 1);
-        
+
         // Verify none have spatial refs initially
         for chunk in &chunks {
             assert!(chunk.spatial_ref.is_none());
         }
-        
+
         let feature_id = FeatureId(123);
         let associated = associate_chunks_with_geometry(chunks, feature_id);
-        
+
         // Verify all have the same spatial ref
         for chunk in &associated {
             assert_eq!(chunk.spatial_ref, Some(feature_id));
@@ -349,11 +268,11 @@ mod tests {
         let text = "Document text with associated geometry.";
         let config = ChunkConfig::default();
         let feature_id = FeatureId(999);
-        
+
         let chunks = chunk_text_with_geometry(text, &config, "test.txt", feature_id).unwrap();
-        
+
         assert!(!chunks.is_empty());
-        
+
         // Verify all chunks have the spatial reference
         for chunk in &chunks {
             assert_eq!(chunk.spatial_ref, Some(feature_id));
@@ -364,21 +283,17 @@ mod tests {
     #[test]
     fn test_chunk_source_tracking() {
         let text = "First chunk. Second chunk. Third chunk.";
-        let config = ChunkConfig {
-            min_size: 5,
-            max_size: 20,
-            overlap: 3,
-        };
-        
+        let config = ChunkConfig { min_size: 5, max_size: 20, overlap: 3 };
+
         let chunks = chunk_text(text, &config, "document.pdf").unwrap();
-        
+
         // Verify ChunkSource is properly tracked
         for chunk in &chunks {
             assert_eq!(chunk.source.document_path, "document.pdf");
             assert!(chunk.source.offset < text.len());
             assert_eq!(chunk.source.page, None);
         }
-        
+
         // Verify offsets are increasing
         for i in 1..chunks.len() {
             assert!(chunks[i].source.offset >= chunks[i - 1].source.offset);

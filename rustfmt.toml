@@ -1,0 +1,50 @@
+# Rust formatting configuration (stable-compatible)
+# See https://rust-lang.github.io/rustfmt/ for all options
+
+edition = "2021"
+
+# Line width
+max_width = 100
+
+# Formatting style
+use_small_heuristics = "Default"
+fn_call_width = 80
+attr_fn_like_width = 80
+struct_lit_width = 40
+struct_variant_width = 40
+array_width = 80
+chain_width = 80
+
+# Indentation
+tab_spaces = 4
+hard_tabs = false
+
+# Imports
+reorder_imports = true
+
+# Misc
+remove_nested_parens = true
+use_try_shorthand = true
+use_field_init_shorthand = true
+force_explicit_abi = true
+
+# Note: The following options require nightly Rust
+# Uncomment and use `cargo +nightly fmt` if you have nightly installed:
+#
+# unstable_features = true
+# imports_granularity = "Crate"
+# group_imports = "StdExternalCrate"
+# comment_width = 80
+# trailing_comma = "Vertical"
+# trailing_semicolon = true
+# match_block_trailing_comma = true
+# control_brace_style = "AlwaysSameLine"
+# brace_style = "SameLineWhere"
+# normalize_comments = true
+# normalize_doc_attributes = true
+# wrap_comments = true
+# format_code_in_doc_comments = true
+# format_strings = true
+# format_macro_matchers = true
+# format_macro_bodies = true
+# condense_wildcard_suffixes = true

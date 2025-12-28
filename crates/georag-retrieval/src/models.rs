@@ -1,5 +1,3 @@
-//! Retrieval models
-
 use georag_core::models::{ChunkId, FeatureId, SpatialFilter};
 use serde::{Deserialize, Serialize};
 
@@ -8,16 +6,16 @@ use serde::{Deserialize, Serialize};
 pub struct QueryPlan {
     /// The text query
     pub text_query: String,
-    
+
     /// Optional spatial filter
     pub spatial_filter: Option<SpatialFilter>,
-    
+
     /// Whether to enable semantic reranking
     pub semantic_rerank: bool,
-    
+
     /// Number of top results to return
     pub top_k: usize,
-    
+
     /// Whether to include detailed explanation
     pub explain: bool,
 }
@@ -64,23 +62,27 @@ impl QueryPlan {
 pub struct QueryResult {
     /// The generated answer
     pub answer: String,
-    
+
     /// Source references used to ground the answer
     pub sources: Vec<SourceReference>,
-    
+
     /// Number of spatial matches before semantic reranking
     pub spatial_matches: usize,
-    
+
     /// Optional semantic similarity scores
     pub semantic_scores: Option<Vec<f32>>,
-    
+
     /// Optional detailed explanation
     pub explanation: Option<QueryExplanation>,
 }
 
 impl QueryResult {
     /// Create a new query result
-    pub fn new(answer: impl Into<String>, sources: Vec<SourceReference>, spatial_matches: usize) -> Self {
+    pub fn new(
+        answer: impl Into<String>,
+        sources: Vec<SourceReference>,
+        spatial_matches: usize,
+    ) -> Self {
         Self {
             answer: answer.into(),
             sources,
@@ -108,19 +110,19 @@ impl QueryResult {
 pub struct SourceReference {
     /// Chunk ID
     pub chunk_id: ChunkId,
-    
+
     /// Optional feature ID
     pub feature_id: Option<FeatureId>,
-    
+
     /// Source document path
     pub document_path: String,
-    
+
     /// Optional page number
     pub page: Option<usize>,
-    
+
     /// Text excerpt
     pub excerpt: String,
-    
+
     /// Relevance score
     pub score: f32,
 }
@@ -130,10 +132,10 @@ pub struct SourceReference {
 pub struct QueryExplanation {
     /// Spatial phase explanation
     pub spatial_phase: SpatialPhaseExplanation,
-    
+
     /// Optional semantic phase explanation
     pub semantic_phase: Option<SemanticPhaseExplanation>,
-    
+
     /// Ranking details for each result
     pub ranking_details: Vec<RankingDetail>,
 }
@@ -143,16 +145,16 @@ pub struct QueryExplanation {
 pub struct SpatialPhaseExplanation {
     /// Spatial predicate used
     pub predicate: String,
-    
+
     /// CRS used for spatial operations
     pub crs: u32,
-    
+
     /// Number of features evaluated
     pub features_evaluated: usize,
-    
+
     /// Number of features that passed the spatial filter
     pub features_matched: usize,
-    
+
     /// Optional distance threshold
     pub distance_threshold: Option<f64>,
 }
@@ -162,13 +164,13 @@ pub struct SpatialPhaseExplanation {
 pub struct SemanticPhaseExplanation {
     /// Embedder model used
     pub embedder_model: String,
-    
+
     /// Embedding dimension
     pub embedding_dim: usize,
-    
+
     /// Number of candidates reranked
     pub candidates_reranked: usize,
-    
+
     /// Query embedding norm
     pub query_norm: f32,
 }
@@ -178,16 +180,16 @@ pub struct SemanticPhaseExplanation {
 pub struct RankingDetail {
     /// Chunk ID
     pub chunk_id: ChunkId,
-    
+
     /// Spatial score (if applicable)
     pub spatial_score: Option<f32>,
-    
+
     /// Semantic similarity score (if applicable)
     pub semantic_score: Option<f32>,
-    
+
     /// Final combined score
     pub final_score: f32,
-    
+
     /// Explanation of score calculation
     pub score_explanation: String,
 }

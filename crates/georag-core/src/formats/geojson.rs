@@ -1,13 +1,13 @@
-//! GeoJSON format reader implementation
-
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
 use crate::error::{GeoragError, Result};
-use crate::formats::{FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation};
 use crate::formats::validation::FormatValidator;
+use crate::formats::{
+    FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation,
+};
 
 /// GeoJSON format reader
 pub struct GeoJsonReader;
@@ -16,12 +16,11 @@ pub struct GeoJsonReader;
 impl FormatReader for GeoJsonReader {
     async fn read(&self, path: &Path) -> Result<FormatDataset> {
         // Read the file
-        let content = fs::read_to_string(path)
-            .map_err(|e| GeoragError::Io(e))?;
+        let content = fs::read_to_string(path).map_err(GeoragError::Io)?;
 
         // Parse as GeoJSON
-        let geojson: geojson::GeoJson = content.parse()
-            .map_err(|e| GeoragError::FormatValidation {
+        let geojson: geojson::GeoJson =
+            content.parse().map_err(|e| GeoragError::FormatValidation {
                 format: "GeoJSON".to_string(),
                 reason: format!("Failed to parse GeoJSON: {}", e),
             })?;
@@ -30,11 +29,7 @@ impl FormatReader for GeoJsonReader {
         let (features, crs) = self.extract_features_and_crs(&geojson)?;
 
         // Get dataset name from filename
-        let name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unnamed")
-            .to_string();
+        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed").to_string();
 
         Ok(FormatDataset {
             name,
@@ -69,7 +64,7 @@ impl FormatReader for GeoJsonReader {
 
         // Validate JSON structure
         let json_validation = FormatValidator::validate_json_structure(path);
-        
+
         // If JSON is valid, try to parse as GeoJSON
         if json_validation.is_valid() {
             match fs::read_to_string(path) {
@@ -91,32 +86,50 @@ impl FormatReader for GeoJsonReader {
 
 impl GeoJsonReader {
     /// Extract features and CRS from GeoJSON
-    fn extract_features_and_crs(&self, geojson: &geojson::GeoJson) -> Result<(Vec<FormatFeature>, u32)> {
+    fn extract_features_and_crs(
+        &self,
+        geojson: &geojson::GeoJson,
+    ) -> Result<(Vec<FormatFeature>, u32)> {
         match geojson {
             geojson::GeoJson::FeatureCollection(fc) => {
-                let features = fc.features
+                let features = fc
+                    .features
                     .iter()
                     .enumerate()
                     .map(|(idx, feature)| self.convert_feature(feature, idx))
                     .collect();
 
                 // Extract CRS (default to WGS84 if not specified)
-                let crs = fc.foreign_members
+                let crs = fc
+                    .foreign_members
                     .as_ref()
                     .and_then(|fm| fm.get("crs"))
-                    .and_then(|crs_obj| extract_epsg_from_crs(crs_obj))
-                    .unwrap_or(4326);
+                    .and_then(extract_epsg_from_crs);
+
+                let crs = match crs {
+                    Some(epsg) => epsg,
+                    None => {
+                        tracing::warn!(
+                            "GeoJSON does not specify CRS, defaulting to EPSG:4326 (WGS84)"
+                        );
+                        4326
+                    }
+                };
 
                 Ok((features, crs))
             }
             geojson::GeoJson::Feature(feature) => {
                 let features = vec![self.convert_feature(feature, 0)];
+                tracing::warn!(
+                    "Single GeoJSON Feature does not specify CRS, defaulting to EPSG:4326 (WGS84)"
+                );
                 Ok((features, 4326))
             }
             geojson::GeoJson::Geometry(geom) => {
                 // Single geometry - wrap in a feature
-                let geometry_json = serde_json::to_value(geom)
-                    .map_err(|e| GeoragError::Serialization(format!("Failed to serialize geometry: {}", e)))?;
+                let geometry_json = serde_json::to_value(geom).map_err(|e| {
+                    GeoragError::Serialization(format!("Failed to serialize geometry: {}", e))
+                })?;
 
                 let feature = FormatFeature {
                     id: "0".to_string(),
@@ -124,6 +137,9 @@ impl GeoJsonReader {
                     properties: HashMap::new(),
                 };
 
+                tracing::warn!(
+                    "Single GeoJSON Geometry does not specify CRS, defaulting to EPSG:4326 (WGS84)"
+                );
                 Ok((vec![feature], 4326))
             }
         }
@@ -132,7 +148,8 @@ impl GeoJsonReader {
     /// Convert a GeoJSON feature to FormatFeature
     fn convert_feature(&self, feature: &geojson::Feature, idx: usize) -> FormatFeature {
         // Get feature ID (use index if not present)
-        let id = feature.id
+        let id = feature
+            .id
             .as_ref()
             .map(|id| match id {
                 geojson::feature::Id::String(s) => s.clone(),
@@ -141,21 +158,16 @@ impl GeoJsonReader {
             .unwrap_or_else(|| idx.to_string());
 
         // Convert geometry to JSON value
-        let geometry = feature.geometry
-            .as_ref()
-            .and_then(|geom| serde_json::to_value(geom).ok());
+        let geometry = feature.geometry.as_ref().and_then(|geom| serde_json::to_value(geom).ok());
 
         // Convert properties from serde_json::Map to HashMap
-        let properties = feature.properties
+        let properties = feature
+            .properties
             .as_ref()
             .map(|props| props.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
-        FormatFeature {
-            id,
-            geometry,
-            properties,
-        }
+        FormatFeature { id, geometry, properties }
     }
 }
 
@@ -166,7 +178,7 @@ fn extract_epsg_from_crs(crs: &serde_json::Value) -> Option<u32> {
         if let Some(name) = props.get("name") {
             if let Some(name_str) = name.as_str() {
                 // Parse "EPSG:4326" or "urn:ogc:def:crs:EPSG::4326"
-                if let Some(epsg_str) = name_str.split(':').last() {
+                if let Some(epsg_str) = name_str.split(':').next_back() {
                     return epsg_str.parse().ok();
                 }
             }
@@ -182,11 +194,11 @@ mod tests {
     #[tokio::test]
     async fn test_geojson_reader_feature_collection() {
         let reader = GeoJsonReader;
-        
+
         // Create a temporary GeoJSON file
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.geojson");
-        
+
         let geojson_content = r#"{
             "type": "FeatureCollection",
             "features": [
@@ -203,11 +215,11 @@ mod tests {
                 }
             ]
         }"#;
-        
+
         fs::write(&file_path, geojson_content).unwrap();
-        
+
         let result = reader.read(&file_path).await.unwrap();
-        
+
         assert_eq!(result.name, "test");
         assert_eq!(result.format_metadata.format_name, "GeoJSON");
         assert_eq!(result.crs, 4326);
@@ -218,10 +230,10 @@ mod tests {
     #[tokio::test]
     async fn test_geojson_reader_single_feature() {
         let reader = GeoJsonReader;
-        
+
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.geojson");
-        
+
         let geojson_content = r#"{
             "type": "Feature",
             "geometry": {
@@ -232,11 +244,11 @@ mod tests {
                 "name": "Single Feature"
             }
         }"#;
-        
+
         fs::write(&file_path, geojson_content).unwrap();
-        
+
         let result = reader.read(&file_path).await.unwrap();
-        
+
         assert_eq!(result.features.len(), 1);
         assert!(result.features[0].geometry.is_some());
     }
@@ -244,15 +256,15 @@ mod tests {
     #[tokio::test]
     async fn test_geojson_reader_validation() {
         let reader = GeoJsonReader;
-        
+
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("invalid.geojson");
-        
+
         // Write invalid JSON
         fs::write(&file_path, "not valid json").unwrap();
-        
+
         let validation = reader.validate(&file_path).await.unwrap();
-        
+
         assert!(!validation.is_valid());
         assert!(!validation.errors.is_empty());
     }

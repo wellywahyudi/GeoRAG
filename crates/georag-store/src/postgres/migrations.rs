@@ -1,5 +1,3 @@
-//! Database migration management
-
 use sqlx::PgPool;
 use thiserror::Error;
 
@@ -50,20 +48,16 @@ impl MigrationManager {
     }
 
     /// Check migration status
-    ///
-    /// Returns information about all migrations, including which
-    /// have been applied and which are pending.
     pub async fn check_status(&self) -> Result<Vec<MigrationStatus>, MigrationError> {
         // Get the migrator
         let migrator = sqlx::migrate!("./migrations");
 
         // Query applied migrations from the database
-        let applied_migrations: Vec<(i64, Vec<u8>)> = sqlx::query_as(
-            "SELECT version, checksum FROM _sqlx_migrations ORDER BY version",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let applied_migrations: Vec<(i64, Vec<u8>)> =
+            sqlx::query_as("SELECT version, checksum FROM _sqlx_migrations ORDER BY version")
+                .fetch_all(&self.pool)
+                .await
+                .unwrap_or_default();
 
         let applied_versions: std::collections::HashSet<i64> =
             applied_migrations.iter().map(|(v, _)| *v).collect();
@@ -90,11 +84,10 @@ impl MigrationManager {
 
     /// Get the current schema version (highest applied migration)
     pub async fn current_version(&self) -> Result<Option<i64>, MigrationError> {
-        let version: Option<(i64,)> = sqlx::query_as(
-            "SELECT version FROM _sqlx_migrations ORDER BY version DESC LIMIT 1",
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let version: Option<(i64,)> =
+            sqlx::query_as("SELECT version FROM _sqlx_migrations ORDER BY version DESC LIMIT 1")
+                .fetch_optional(&self.pool)
+                .await?;
 
         Ok(version.map(|(v,)| v))
     }

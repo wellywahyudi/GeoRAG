@@ -1,7 +1,5 @@
-//! Index management operations
-
+use georag_core::error::{GeoragError, Result};
 use sqlx::PgPool;
-use georag_core::error::{Result, GeoragError};
 use std::time::Instant;
 
 /// Result of an index rebuild operation
@@ -52,9 +50,6 @@ pub struct VacuumResult {
 /// * `index_name` - Optional specific index to rebuild (rebuilds all if None)
 /// * `concurrently` - Whether to rebuild concurrently (non-blocking)
 ///
-/// # Requirements
-/// - 10.1: Rebuild all spatial and vector indexes
-/// - 10.5: Rebuild without blocking read operations (CONCURRENTLY)
 pub async fn rebuild_indexes(
     pool: &PgPool,
     index_name: Option<&str>,
@@ -86,11 +81,7 @@ pub async fn rebuild_indexes(
 
     let duration_secs = start.elapsed().as_secs_f64();
 
-    Ok(RebuildResult {
-        indexes_rebuilt,
-        duration_secs,
-        warnings,
-    })
+    Ok(RebuildResult { indexes_rebuilt, duration_secs, warnings })
 }
 
 /// Get list of GeoRAG-related indexes
@@ -115,15 +106,11 @@ async fn get_georag_indexes(pool: &PgPool) -> Result<Vec<String>> {
 }
 
 /// Rebuild a single index
-async fn rebuild_single_index(
-    pool: &PgPool,
-    index_name: &str,
-    concurrently: bool,
-) -> Result<()> {
+async fn rebuild_single_index(pool: &PgPool, index_name: &str, concurrently: bool) -> Result<()> {
     let concurrent_clause = if concurrently { "CONCURRENTLY" } else { "" };
-    
+
     let query = format!("REINDEX INDEX {} {}", concurrent_clause, index_name);
-    
+
     sqlx::query(&query)
         .execute(pool)
         .await
@@ -133,17 +120,7 @@ async fn rebuild_single_index(
 }
 
 /// Get statistics for database indexes
-///
-/// # Arguments
-/// * `pool` - Database connection pool
-/// * `index_name` - Optional specific index to get stats for (gets all if None)
-///
-/// # Requirements
-/// - 10.2: Report index size, row count, and last vacuum time
-pub async fn get_index_stats(
-    pool: &PgPool,
-    index_name: Option<&str>,
-) -> Result<Vec<IndexStats>> {
+pub async fn get_index_stats(pool: &PgPool, index_name: Option<&str>) -> Result<Vec<IndexStats>> {
     let query = if let Some(name) = index_name {
         format!(
             r#"
@@ -183,15 +160,18 @@ pub async fn get_index_stats(
         "#.to_string()
     };
 
-    let rows = sqlx::query_as::<_, (String, String, String, i64, i64, Option<String>, Option<String>)>(&query)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| GeoragError::Serialization(format!("Failed to get index stats: {}", e)))?;
+    let rows = sqlx::query_as::<
+        _,
+        (String, String, String, i64, i64, Option<String>, Option<String>),
+    >(&query)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| GeoragError::Serialization(format!("Failed to get index stats: {}", e)))?;
 
     let stats = rows
         .into_iter()
-        .map(|(index_name, table_name, index_type, size_bytes, row_count, last_vacuum, last_analyze)| {
-            IndexStats {
+        .map(
+            |(
                 index_name,
                 table_name,
                 index_type,
@@ -199,23 +179,24 @@ pub async fn get_index_stats(
                 row_count,
                 last_vacuum,
                 last_analyze,
-            }
-        })
+            )| {
+                IndexStats {
+                    index_name,
+                    table_name,
+                    index_type,
+                    size_bytes,
+                    row_count,
+                    last_vacuum,
+                    last_analyze,
+                }
+            },
+        )
         .collect();
 
     Ok(stats)
 }
 
 /// Run VACUUM and optionally ANALYZE on database tables
-///
-/// # Arguments
-/// * `pool` - Database connection pool
-/// * `table_name` - Optional specific table to vacuum (vacuums all if None)
-/// * `analyze` - Whether to run ANALYZE after VACUUM
-/// * `full` - Whether to run FULL vacuum (locks table, reclaims more space)
-///
-/// # Requirements
-/// - 10.4: Support VACUUM and ANALYZE operations
 pub async fn vacuum_analyze(
     pool: &PgPool,
     table_name: Option<&str>,
@@ -282,19 +263,19 @@ async fn vacuum_single_table(
     full: bool,
 ) -> Result<()> {
     let mut parts = vec!["VACUUM"];
-    
+
     if full {
         parts.push("FULL");
     }
-    
+
     if analyze {
         parts.push("ANALYZE");
     }
-    
+
     parts.push(table_name);
-    
+
     let query = parts.join(" ");
-    
+
     sqlx::query(&query)
         .execute(pool)
         .await
@@ -314,7 +295,7 @@ mod tests {
             duration_secs: 1.23,
             warnings: vec!["test warning".to_string()],
         };
-        
+
         assert_eq!(result.indexes_rebuilt, 5);
         assert_eq!(result.duration_secs, 1.23);
         assert_eq!(result.warnings.len(), 1);
@@ -331,7 +312,7 @@ mod tests {
             last_vacuum: Some("2024-01-01".to_string()),
             last_analyze: Some("2024-01-01".to_string()),
         };
-        
+
         assert_eq!(stats.index_name, "idx_test");
         assert_eq!(stats.size_bytes, 1024);
     }
@@ -343,7 +324,7 @@ mod tests {
             duration_secs: 2.45,
             warnings: vec![],
         };
-        
+
         assert_eq!(result.tables_processed, 3);
         assert_eq!(result.duration_secs, 2.45);
         assert!(result.warnings.is_empty());

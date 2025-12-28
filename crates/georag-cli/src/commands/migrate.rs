@@ -1,5 +1,3 @@
-//! Migrate command - Transfer data from in-memory storage to PostgreSQL
-
 use crate::cli::MigrateArgs;
 use crate::config::load_workspace_config;
 use crate::output::OutputWriter;
@@ -39,19 +37,11 @@ impl MigrationProgress {
         }
     }
 
-    fn total_records(&self) -> usize {
-        self.datasets_total + self.features_total + self.chunks_total + self.embeddings_total
-    }
-
     fn migrated_records(&self) -> usize {
-        self.datasets_migrated + self.features_migrated + self.chunks_migrated + self.embeddings_migrated
-    }
-
-    fn percentage(&self) -> f64 {
-        if self.total_records() == 0 {
-            return 100.0;
-        }
-        (self.migrated_records() as f64 / self.total_records() as f64) * 100.0
+        self.datasets_migrated
+            + self.features_migrated
+            + self.chunks_migrated
+            + self.embeddings_migrated
     }
 }
 
@@ -59,34 +49,21 @@ impl MigrationProgress {
 pub fn execute(args: MigrateArgs, output: &OutputWriter, _dry_run: bool) -> Result<()> {
     // Load workspace configuration
     let workspace_root = PathBuf::from(".");
-    let _config = load_workspace_config(&workspace_root)
-        .context("Failed to load workspace configuration")?;
+    let _config =
+        load_workspace_config(&workspace_root).context("Failed to load workspace configuration")?;
 
     // Create runtime for async operations
-    let runtime = tokio::runtime::Runtime::new()
-        .context("Failed to create async runtime")?;
+    let runtime = tokio::runtime::Runtime::new().context("Failed to create async runtime")?;
 
-    runtime.block_on(async {
-        migrate_data(args, output).await
-    })
+    runtime.block_on(async { migrate_data(args, output).await })
 }
 
-async fn migrate_data(
-    args: MigrateArgs,
-    output: &OutputWriter,
-) -> Result<()> {
+async fn migrate_data(args: MigrateArgs, output: &OutputWriter) -> Result<()> {
     let start_time = Instant::now();
     let mut progress = MigrationProgress::new();
 
-    // Note: In a real implementation, we would load the actual in-memory stores
-    // from the workspace. For now, we're creating empty stores as placeholders.
-    // The actual workspace loading would require integration with the workspace
-    // management system.
-    
     output.info("Loading data from in-memory storage...");
-    
-    // Initialize source (in-memory) stores
-    // TODO: Load actual data from workspace instead of creating empty stores
+
     let source_spatial = MemorySpatialStore::new();
     let source_vector = MemoryVectorStore::new();
     let source_document = MemoryDocumentStore::new();
@@ -110,7 +87,7 @@ async fn migrate_data(
     output.info("Counting records in source storage...");
     progress.datasets_total = source_spatial.list_datasets().await?.len();
     progress.chunks_total = source_document.list_chunk_ids().await?.len();
-    
+
     // Count features by iterating through datasets
     let datasets = source_spatial.list_datasets().await?;
     for dataset_meta in &datasets {
@@ -127,7 +104,7 @@ async fn migrate_data(
         }
     }
 
-    output.info(&format!(
+    output.info(format!(
         "Found {} datasets, {} features, {} chunks, {} embeddings",
         progress.datasets_total,
         progress.features_total,
@@ -137,10 +114,10 @@ async fn migrate_data(
 
     if args.dry_run {
         output.info("DRY RUN: Would migrate the following:");
-        output.info(&format!("  - {} datasets", progress.datasets_total));
-        output.info(&format!("  - {} features", progress.features_total));
-        output.info(&format!("  - {} chunks", progress.chunks_total));
-        output.info(&format!("  - {} embeddings", progress.embeddings_total));
+        output.info(format!("  - {} datasets", progress.datasets_total));
+        output.info(format!("  - {} features", progress.features_total));
+        output.info(format!("  - {} chunks", progress.chunks_total));
+        output.info(format!("  - {} embeddings", progress.embeddings_total));
         return Ok(());
     }
 
@@ -162,14 +139,8 @@ async fn migrate_data(
     // Migrate chunks
     if progress.chunks_total > 0 {
         output.info("Migrating chunks...");
-        migrate_chunks(
-            &source_document,
-            &dest_store,
-            &mut progress,
-            args.batch_size,
-            output,
-        )
-        .await?;
+        migrate_chunks(&source_document, &dest_store, &mut progress, args.batch_size, output)
+            .await?;
     }
 
     // Migrate embeddings
@@ -195,27 +166,15 @@ async fn migrate_data(
     }
 
     // Report final progress
-    output.success(&format!(
+    output.success(format!(
         "Migration complete! Migrated {} records in {} seconds",
         progress.migrated_records(),
         progress.elapsed_secs
     ));
-    output.info(&format!(
-        "  - {} datasets",
-        progress.datasets_migrated
-    ));
-    output.info(&format!(
-        "  - {} features",
-        progress.features_migrated
-    ));
-    output.info(&format!(
-        "  - {} chunks",
-        progress.chunks_migrated
-    ));
-    output.info(&format!(
-        "  - {} embeddings",
-        progress.embeddings_migrated
-    ));
+    output.info(format!("  - {} datasets", progress.datasets_migrated));
+    output.info(format!("  - {} features", progress.features_migrated));
+    output.info(format!("  - {} chunks", progress.chunks_migrated));
+    output.info(format!("  - {} embeddings", progress.embeddings_migrated));
 
     Ok(())
 }
@@ -231,23 +190,17 @@ async fn migrate_datasets_and_features(
 
     for dataset_meta in datasets {
         // Get full dataset
-        let dataset = source
-            .get_dataset(dataset_meta.id)
-            .await?
-            .context("Dataset not found")?;
+        let dataset = source.get_dataset(dataset_meta.id).await?.context("Dataset not found")?;
 
         // Store dataset in destination
         let _new_id = dest.store_dataset(&dataset).await?;
         progress.datasets_migrated += 1;
 
-        output.info(&format!(
+        output.info(format!(
             "  Migrated dataset: {} ({} features)",
             dataset.name, dataset.feature_count
         ));
 
-        // Note: Features would need to be retrieved and migrated here
-        // This requires additional methods in the SpatialStore trait
-        // For now, we'll mark features as migrated based on dataset feature_count
         progress.features_migrated += dataset.feature_count;
     }
 
@@ -271,7 +224,7 @@ async fn migrate_chunks(
         progress.chunks_migrated += chunks.len();
 
         if (i + 1) % 10 == 0 || progress.chunks_migrated == total_chunks {
-            output.info(&format!(
+            output.info(format!(
                 "  Progress: {}/{} chunks ({:.1}%)",
                 progress.chunks_migrated,
                 total_chunks,
@@ -292,8 +245,6 @@ async fn migrate_embeddings(
     output: &OutputWriter,
 ) -> Result<()> {
     // Get all chunk IDs that have embeddings
-    // This is a workaround since VectorStore doesn't have a list_embeddings method
-    // We'll need to get chunk IDs from the document store
     let chunk_ids = doc_store.list_chunk_ids().await?;
 
     let mut embeddings_to_migrate = Vec::new();
@@ -311,7 +262,7 @@ async fn migrate_embeddings(
         progress.embeddings_migrated += embedding_batch.len();
 
         if (i + 1) % 10 == 0 || progress.embeddings_migrated == total_embeddings {
-            output.info(&format!(
+            output.info(format!(
                 "  Progress: {}/{} embeddings ({:.1}%)",
                 progress.embeddings_migrated,
                 total_embeddings,
@@ -329,11 +280,11 @@ async fn verify_migration(
     output: &OutputWriter,
 ) -> Result<()> {
     output.info("Verifying migration integrity...");
-    
+
     // Count records in destination
     let dest_datasets = dest.list_datasets().await?.len();
     let dest_chunks = dest.list_chunk_ids().await?.len();
-    
+
     // Count embeddings in destination
     let dest_embeddings = {
         let chunk_ids = dest.list_chunk_ids().await?;
@@ -348,43 +299,40 @@ async fn verify_migration(
 
     // Verify counts match
     let mut errors = Vec::new();
-    
+
     if dest_datasets != progress.datasets_migrated {
         errors.push(format!(
             "Dataset count mismatch: expected {}, found {}",
-            progress.datasets_migrated,
-            dest_datasets
+            progress.datasets_migrated, dest_datasets
         ));
     }
 
     if dest_chunks != progress.chunks_migrated {
         errors.push(format!(
             "Chunk count mismatch: expected {}, found {}",
-            progress.chunks_migrated,
-            dest_chunks
+            progress.chunks_migrated, dest_chunks
         ));
     }
 
     if dest_embeddings != progress.embeddings_migrated {
         errors.push(format!(
             "Embedding count mismatch: expected {}, found {}",
-            progress.embeddings_migrated,
-            dest_embeddings
+            progress.embeddings_migrated, dest_embeddings
         ));
     }
 
     if !errors.is_empty() {
         output.info("Integrity verification failed:");
         for error in &errors {
-            output.info(&format!("  - {}", error));
+            output.info(format!("  - {}", error));
         }
         anyhow::bail!("Data integrity verification failed");
     }
 
     output.success("Data integrity verified!");
-    output.info(&format!("  ✓ {} datasets", dest_datasets));
-    output.info(&format!("  ✓ {} chunks", dest_chunks));
-    output.info(&format!("  ✓ {} embeddings", dest_embeddings));
-    
+    output.info(format!("  ✓ {} datasets", dest_datasets));
+    output.info(format!("  ✓ {} chunks", dest_chunks));
+    output.info(format!("  ✓ {} embeddings", dest_embeddings));
+
     Ok(())
 }

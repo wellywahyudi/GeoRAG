@@ -1,10 +1,3 @@
-//! Layered configuration management
-//!
-//! This module implements a layered configuration system with the following precedence:
-//! CLI arguments > Environment variables > Config file > Defaults
-//!
-//! Each configuration value tracks its source for inspectability.
-
 use crate::error::{GeoragError, Result};
 use crate::models::workspace::{DistanceUnit, ValidityMode};
 use serde::{Deserialize, Serialize};
@@ -75,20 +68,23 @@ impl LayeredConfig {
             crs: ConfigValue::new(4326, ConfigSource::Default),
             distance_unit: ConfigValue::new(DistanceUnit::Meters, ConfigSource::Default),
             geometry_validity: ConfigValue::new(ValidityMode::Lenient, ConfigSource::Default),
-            embedder: ConfigValue::new("ollama:nomic-embed-text".to_string(), ConfigSource::Default),
+            embedder: ConfigValue::new(
+                "ollama:nomic-embed-text".to_string(),
+                ConfigSource::Default,
+            ),
         }
     }
 
     /// Load configuration from a TOML file
     pub fn load_from_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self> {
-        let content = fs::read_to_string(path.as_ref())
-            .map_err(|e| GeoragError::ConfigInvalid {
+        let content =
+            fs::read_to_string(path.as_ref()).map_err(|e| GeoragError::ConfigInvalid {
                 key: "file".to_string(),
                 reason: format!("Failed to read config file: {}", e),
             })?;
 
-        let file_config: FileConfig = toml::from_str(&content)
-            .map_err(|e| GeoragError::ConfigInvalid {
+        let file_config: FileConfig =
+            toml::from_str(&content).map_err(|e| GeoragError::ConfigInvalid {
                 key: "file".to_string(),
                 reason: format!("Failed to parse TOML: {}", e),
             })?;
@@ -166,26 +162,20 @@ impl LayeredConfig {
     /// Get all configuration values as a map for inspection
     pub fn to_inspection_map(&self) -> HashMap<String, (String, ConfigSource)> {
         let mut map = HashMap::new();
-        
-        map.insert(
-            "crs".to_string(),
-            (format!("EPSG:{}", self.crs.value), self.crs.source),
-        );
-        
+
+        map.insert("crs".to_string(), (format!("EPSG:{}", self.crs.value), self.crs.source));
+
         map.insert(
             "distance_unit".to_string(),
             (format!("{:?}", self.distance_unit.value), self.distance_unit.source),
         );
-        
+
         map.insert(
             "geometry_validity".to_string(),
             (format!("{:?}", self.geometry_validity.value), self.geometry_validity.source),
         );
-        
-        map.insert(
-            "embedder".to_string(),
-            (self.embedder.value.clone(), self.embedder.source),
-        );
+
+        map.insert("embedder".to_string(), (self.embedder.value.clone(), self.embedder.source));
 
         map
     }
@@ -253,22 +243,22 @@ mod tests {
     #[test]
     fn test_config_precedence() {
         let mut value = ConfigValue::new(100, ConfigSource::Default);
-        
+
         // File should override default
         value.update(200, ConfigSource::File);
         assert_eq!(value.value, 200);
         assert_eq!(value.source, ConfigSource::File);
-        
+
         // Environment should override file
         value.update(300, ConfigSource::Environment);
         assert_eq!(value.value, 300);
         assert_eq!(value.source, ConfigSource::Environment);
-        
+
         // CLI should override environment
         value.update(400, ConfigSource::Cli);
         assert_eq!(value.value, 400);
         assert_eq!(value.source, ConfigSource::Cli);
-        
+
         // Lower precedence should not override
         value.update(500, ConfigSource::File);
         assert_eq!(value.value, 400); // Still CLI value
@@ -289,9 +279,7 @@ embedder = "ollama:custom-model"
         )
         .unwrap();
 
-        let config = LayeredConfig::with_defaults()
-            .load_from_file(file.path())
-            .unwrap();
+        let config = LayeredConfig::with_defaults().load_from_file(file.path()).unwrap();
 
         assert_eq!(config.crs.value, 3857);
         assert_eq!(config.crs.source, ConfigSource::File);
@@ -303,7 +291,7 @@ embedder = "ollama:custom-model"
     #[test]
     fn test_cli_overrides() {
         let mut config = LayeredConfig::with_defaults();
-        
+
         let overrides = CliConfigOverrides {
             crs: Some(32748),
             distance_unit: Some(DistanceUnit::Miles),
@@ -342,12 +330,12 @@ embedder = "ollama:custom-model"
     fn test_inspection_map() {
         let config = LayeredConfig::with_defaults();
         let map = config.to_inspection_map();
-        
+
         assert!(map.contains_key("crs"));
         assert!(map.contains_key("distance_unit"));
         assert!(map.contains_key("geometry_validity"));
         assert!(map.contains_key("embedder"));
-        
+
         let (crs_value, crs_source) = &map["crs"];
         assert_eq!(crs_value, "EPSG:4326");
         assert_eq!(*crs_source, ConfigSource::Default);
