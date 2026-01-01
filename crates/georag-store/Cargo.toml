@@ -15,7 +15,7 @@ serde.workspace = true
 tokio.workspace = true
 
 # PostgreSQL dependencies
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "migrate", "chrono"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "migrate", "chrono"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 serde_json.workspace = true
 

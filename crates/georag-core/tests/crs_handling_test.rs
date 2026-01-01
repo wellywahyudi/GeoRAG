@@ -186,15 +186,15 @@ fn test_all_formats_have_crs_handling() {
 #[test]
 fn test_crs_requirements_coverage() {
     // Geospatial formats that extract CRS:
-    let geospatial_formats = vec!["GeoJSON", "Shapefile"];
+    let geospatial_formats = ["GeoJSON", "Shapefile"];
     assert_eq!(geospatial_formats.len(), 2);
 
     // Geospatial formats with fixed CRS:
-    let fixed_crs_formats = vec!["GPX", "KML"];
+    let fixed_crs_formats = ["GPX", "KML"];
     assert_eq!(fixed_crs_formats.len(), 2);
 
     // Document formats that default to 4326:
-    let document_formats = vec!["PDF", "DOCX"];
+    let document_formats = ["PDF", "DOCX"];
     assert_eq!(document_formats.len(), 2);
 
     // All formats covered

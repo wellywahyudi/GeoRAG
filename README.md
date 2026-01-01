@@ -162,36 +162,6 @@ georag query "What cities are in the region?" \
   --geometry region-boundary.geojson
 ```
 
-### Using PostgreSQL
-
-```bash
-# Set database URL
-export DATABASE_URL="postgresql://localhost/georag"
-
-# Initialize with PostgreSQL
-georag init --storage postgres
-
-# Add and build
-georag add data.geojson --storage postgres
-georag build --storage postgres
-
-# Database maintenance
-georag db stats
-georag db rebuild
-```
-
-### JSON Output for Scripting
-
-```bash
-# Get JSON output
-georag status --json | jq '.data.index.built'
-
-# Check build status
-if georag status --json | jq -e '.data.index.built == true'; then
-  echo "Index is built"
-fi
-```
-
 ## Crates
 
 The GeoRAG workspace is organized into focused crates:
@@ -230,64 +200,7 @@ make fmt-check
 make check
 ```
 
-See [FORMATTING.md](FORMATTING.md) for detailed formatting guidelines.
-
-### Building
-
-```bash
-# Build all crates
-cargo build --release
-
-# Build specific crate
-cargo build -p georag-cli
-
-# Run tests
-cargo test
-
-# Format and lint
-cargo fmt
-cargo clippy
-```
-
-## Design Principles
-
-### Correctness First
-
-- Explicit CRS handling with validation
-- Deterministic index builds
-- Property-based testing for core operations
-- No silent failures or data loss
-
-### Local-First
-
-- All processing happens locally
-- No cloud dependencies required
-- Optional cloud adapters for scaling
-- Full data privacy
-
-### Inspectable
-
-- Every operation can be explained
-- Configuration sources are traceable
-- Index builds are reproducible
-- Dry-run mode for all state changes
-
-## Roadmap
-
-- [x] Core workspace management
-- [x] Dataset registration and validation
-- [x] Index building with embeddings
-- [x] Spatial-semantic query execution
-- [x] Interactive CLI with progress indicators
-- [x] PostgreSQL/PostGIS storage backend
-- [x] Configuration file support
-- [x] Health check diagnostics
-- [ ] Embedding generation with local models
-- [ ] Spatial predicates and operations
-- [ ] HTTP API server
-- [ ] MCP protocol support
-- [ ] Additional embedding models
-- [ ] Web UI
+See [docs/FORMATTING.md](docs/FORMATTING.md) for detailed formatting guidelines.
 
 ## Contributing
 
@@ -308,7 +221,7 @@ We welcome contributions! Here's how you can help:
 6. Push to the branch
 7. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
 ## Documentation
 
@@ -338,11 +251,3 @@ GeoRAG is built with excellent open-source tools:
 - [clap](https://github.com/clap-rs/clap) - Command-line argument parsing
 - [tokio](https://tokio.rs/) - Asynchronous runtime
 - [PostgreSQL](https://www.postgresql.org/) & [PostGIS](https://postgis.net/) - Spatial database
-
----
-
-<div align="center">
-
-**[Get Started →](docs/quick-start.md)**
-
-</div>

@@ -21,7 +21,7 @@ fn test_json_output_is_valid() {
     let _ = std::fs::remove_dir_all(test_dir);
 
     let output = Command::new(georag_bin())
-        .args(&["init", test_dir, "--json"])
+        .args(["init", test_dir, "--json"])
         .output()
         .expect("Failed to execute command");
 
@@ -48,7 +48,7 @@ fn test_dry_run_no_state_modification() {
 
     // Run with dry-run
     let output = Command::new(georag_bin())
-        .args(&["init", test_dir, "--dry-run"])
+        .args(["init", test_dir, "--dry-run"])
         .output()
         .expect("Failed to execute command");
 
@@ -62,7 +62,7 @@ fn test_dry_run_no_state_modification() {
 #[test]
 fn test_dry_run_with_json_output() {
     let output = Command::new(georag_bin())
-        .args(&["init", "/tmp/test-dry-run-json", "--dry-run", "--json"])
+        .args(["init", "/tmp/test-dry-run-json", "--dry-run", "--json"])
         .output()
         .expect("Failed to execute command");
 
@@ -91,7 +91,7 @@ fn test_actual_init_creates_files() {
 
     // Run without dry-run
     let output = Command::new(georag_bin())
-        .args(&["init", test_dir])
+        .args(["init", test_dir])
         .output()
         .expect("Failed to execute command");
 

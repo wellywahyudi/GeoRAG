@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use georag_core::models::workspace::IndexState;
 use georag_core::models::{DatasetMeta, WorkspaceConfig};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tabled::Tabled;
 
 pub fn execute(args: StatusArgs, output: &OutputWriter) -> Result<()> {
@@ -44,8 +44,8 @@ pub fn execute(args: StatusArgs, output: &OutputWriter) -> Result<()> {
 
 /// Show overall workspace status
 fn show_overall_status(
-    workspace_root: &PathBuf,
-    georag_dir: &PathBuf,
+    workspace_root: &Path,
+    georag_dir: &Path,
     output: &OutputWriter,
     verbose: bool,
 ) -> Result<()> {
@@ -105,8 +105,9 @@ fn show_overall_status(
         output.kv("Distance Unit", format!("{:?}", config.distance_unit));
         output.kv("Datasets", datasets.len());
 
-        if verbose && storage_status.is_some() {
-            let storage = storage_status.unwrap();
+        if verbose {
+            let storage =
+                storage_status.expect("storage_status should be Some when verbose is true");
             output.section("Storage Status");
             output.kv("Datasets Directory", if storage.datasets_dir { "✓" } else { "✗" });
             output.kv("Index Directory", if storage.index_dir { "✓" } else { "✗" });
@@ -117,7 +118,7 @@ fn show_overall_status(
 }
 
 /// Show datasets information
-fn show_datasets(georag_dir: &PathBuf, output: &OutputWriter, is_part_of_all: bool) -> Result<()> {
+fn show_datasets(georag_dir: &Path, output: &OutputWriter, is_part_of_all: bool) -> Result<()> {
     let datasets = load_datasets(georag_dir)?;
 
     if datasets.is_empty() {
@@ -178,7 +179,7 @@ fn show_datasets(georag_dir: &PathBuf, output: &OutputWriter, is_part_of_all: bo
 }
 
 /// Show index information
-fn show_index(georag_dir: &PathBuf, output: &OutputWriter, is_part_of_all: bool) -> Result<()> {
+fn show_index(georag_dir: &Path, output: &OutputWriter, is_part_of_all: bool) -> Result<()> {
     let state_path = georag_dir.join("index").join("state.json");
 
     if !state_path.exists() {
@@ -226,7 +227,7 @@ fn show_index(georag_dir: &PathBuf, output: &OutputWriter, is_part_of_all: bool)
 }
 
 /// Show CRS information
-fn show_crs(georag_dir: &PathBuf, output: &OutputWriter, _is_part_of_all: bool) -> Result<()> {
+fn show_crs(georag_dir: &Path, output: &OutputWriter, _is_part_of_all: bool) -> Result<()> {
     let config = load_workspace_config(georag_dir)?;
     let datasets = load_datasets(georag_dir)?;
 
@@ -279,7 +280,7 @@ fn show_crs(georag_dir: &PathBuf, output: &OutputWriter, _is_part_of_all: bool) 
 }
 
 /// Show configuration
-fn show_config(georag_dir: &PathBuf, output: &OutputWriter, is_part_of_all: bool) -> Result<()> {
+fn show_config(georag_dir: &Path, output: &OutputWriter, is_part_of_all: bool) -> Result<()> {
     use georag_core::config::LayeredConfig;
 
     let config_path = georag_dir.join("config.toml");
@@ -389,7 +390,7 @@ fn find_workspace_root() -> Result<PathBuf> {
     }
 }
 
-fn load_workspace_config(georag_dir: &PathBuf) -> Result<WorkspaceConfig> {
+fn load_workspace_config(georag_dir: &Path) -> Result<WorkspaceConfig> {
     let config_path = georag_dir.join("config.toml");
     let config_content = fs::read_to_string(&config_path).context("Failed to read config.toml")?;
     let config: WorkspaceConfig =
@@ -397,7 +398,7 @@ fn load_workspace_config(georag_dir: &PathBuf) -> Result<WorkspaceConfig> {
     Ok(config)
 }
 
-fn load_datasets(georag_dir: &PathBuf) -> Result<Vec<DatasetMeta>> {
+fn load_datasets(georag_dir: &Path) -> Result<Vec<DatasetMeta>> {
     let datasets_file = georag_dir.join("datasets.json");
     if !datasets_file.exists() {
         return Ok(Vec::new());
@@ -408,7 +409,7 @@ fn load_datasets(georag_dir: &PathBuf) -> Result<Vec<DatasetMeta>> {
     Ok(datasets)
 }
 
-fn load_index_state_optional(georag_dir: &PathBuf) -> Option<IndexState> {
+fn load_index_state_optional(georag_dir: &Path) -> Option<IndexState> {
     let state_path = georag_dir.join("index").join("state.json");
     if !state_path.exists() {
         return None;
@@ -419,7 +420,7 @@ fn load_index_state_optional(georag_dir: &PathBuf) -> Option<IndexState> {
     Some(state)
 }
 
-fn load_index_state(georag_dir: &PathBuf) -> Result<IndexState> {
+fn load_index_state(georag_dir: &Path) -> Result<IndexState> {
     let state_path = georag_dir.join("index").join("state.json");
     let content = fs::read_to_string(&state_path)?;
     let state: IndexState = serde_json::from_str(&content)?;

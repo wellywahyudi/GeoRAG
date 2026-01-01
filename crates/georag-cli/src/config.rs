@@ -266,7 +266,7 @@ pub fn find_workspace_root() -> Result<PathBuf> {
 // ============================================================================
 
 /// Load layered configuration for a workspace
-pub fn load_workspace_config(workspace_root: &PathBuf) -> Result<LayeredConfig> {
+pub fn load_workspace_config(workspace_root: &Path) -> Result<LayeredConfig> {
     let config_path = workspace_root.join(".georag").join("config.toml");
 
     let config = LayeredConfig::with_defaults()
@@ -279,7 +279,7 @@ pub fn load_workspace_config(workspace_root: &PathBuf) -> Result<LayeredConfig> 
 
 /// Load layered configuration with CLI overrides
 pub fn load_workspace_config_with_overrides(
-    workspace_root: &PathBuf,
+    workspace_root: &Path,
     overrides: CliConfigOverrides,
 ) -> Result<LayeredConfig> {
     let mut config = load_workspace_config(workspace_root)?;

@@ -272,7 +272,7 @@ mod tests {
     fn test_chunk_text_preserves_paragraphs() {
         let reader = PdfReader;
         let text = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.";
-        let chunks = reader.chunk_text(&text, 10, 2);
+        let chunks = reader.chunk_text(text, 10, 2);
 
         // Should have at least one chunk
         assert!(!chunks.is_empty());
@@ -320,8 +320,8 @@ mod tests {
             let second_chunk_words: Vec<&str> = chunks[1].text.split_whitespace().collect();
 
             // Second chunk should start with some words that appeared at end of first chunk
-            assert!(first_chunk_words.len() > 0);
-            assert!(second_chunk_words.len() > 0);
+            assert!(!first_chunk_words.is_empty());
+            assert!(!second_chunk_words.is_empty());
         }
     }
 }

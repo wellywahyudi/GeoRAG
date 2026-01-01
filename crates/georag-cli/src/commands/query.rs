@@ -8,7 +8,7 @@ use georag_core::models::WorkspaceConfig;
 use georag_geo::models::{Distance, DistanceUnit};
 use georag_retrieval::models::{QueryPlan, QueryResult, SourceReference};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub async fn execute(
     args: QueryArgs,
@@ -185,7 +185,7 @@ fn find_workspace_root() -> Result<PathBuf> {
 }
 
 /// Load workspace configuration
-fn load_workspace_config(georag_dir: &PathBuf) -> Result<WorkspaceConfig> {
+fn load_workspace_config(georag_dir: &Path) -> Result<WorkspaceConfig> {
     let config_path = georag_dir.join("config.toml");
     let config_content = fs::read_to_string(&config_path).context("Failed to read config.toml")?;
     let config: WorkspaceConfig =
@@ -194,7 +194,7 @@ fn load_workspace_config(georag_dir: &PathBuf) -> Result<WorkspaceConfig> {
 }
 
 /// Load index state
-fn load_index_state(georag_dir: &PathBuf) -> Result<IndexState> {
+fn load_index_state(georag_dir: &Path) -> Result<IndexState> {
     let state_path = georag_dir.join("index").join("state.json");
     if !state_path.exists() {
         bail!("Index not built. Run 'georag build' first.");

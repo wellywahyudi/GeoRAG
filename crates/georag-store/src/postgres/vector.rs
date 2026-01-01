@@ -30,7 +30,7 @@ impl PostgresStore {
 
             // Use sqrt(row_count) with min of 10 and max of 1000
             let calculated = (row_count as f64).sqrt() as usize;
-            calculated.max(10).min(1000)
+            calculated.clamp(10, 1000)
         };
 
         // Create index with CONCURRENTLY if configured

@@ -217,16 +217,17 @@ mod tests {
 
     #[test]
     fn test_pool_config_invalid_min_max() {
-        let mut pool = PoolConfig::default();
-        pool.min_connections = 20;
-        pool.max_connections = 10;
+        let pool = PoolConfig {
+            min_connections: 20,
+            max_connections: 10,
+            ..Default::default()
+        };
         assert!(pool.validate().is_err());
     }
 
     #[test]
     fn test_pool_config_zero_max() {
-        let mut pool = PoolConfig::default();
-        pool.max_connections = 0;
+        let pool = PoolConfig { max_connections: 0, ..Default::default() };
         assert!(pool.validate().is_err());
     }
 

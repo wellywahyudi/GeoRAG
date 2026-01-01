@@ -13,7 +13,7 @@ use georag_core::formats::{
 use georag_core::models::dataset::GeometryType;
 use georag_core::models::{Dataset, DatasetId};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub async fn execute(
     args: AddArgs,
@@ -418,7 +418,7 @@ fn find_workspace_root() -> Result<PathBuf> {
 }
 
 /// Read dataset metadata from a GeoJSON file
-fn read_dataset_metadata(path: &PathBuf) -> Result<(GeometryType, usize, u32)> {
+fn read_dataset_metadata(path: &Path) -> Result<(GeometryType, usize, u32)> {
     // Read the file
     let content = fs::read_to_string(path).context("Failed to read dataset file")?;
 
