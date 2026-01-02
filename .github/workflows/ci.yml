@@ -48,15 +48,6 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
-      - name: Install system dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev gdal-bin postgresql-client
-      - name: Install system dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install gdal postgresql
       - name: Run tests
         run: cargo test --all --verbose
 
@@ -74,14 +65,10 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
-      - name: Install system dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install system dependencies (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev gdal-bin
-      - name: Install system dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install gdal
+          vcpkg install proj:x64-windows sqlite3:x64-windows
+          echo "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build
         run: cargo build --all --release --verbose
