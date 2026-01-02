@@ -132,7 +132,7 @@ impl FormatValidator {
             Ok(content) => {
                 use quick_xml::Reader;
                 let mut reader = Reader::from_str(&content);
-                reader.trim_text(true);
+                reader.config_mut().trim_text(true);
 
                 let mut buf = Vec::new();
                 loop {

@@ -19,7 +19,7 @@ repository = "https://github.com/wellywahyudi/georag"
 
 [workspace.dependencies]
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 anyhow = "1.0"
 
 # Serialization
@@ -28,38 +28,38 @@ serde_json = "1.0"
 toml = "0.8"
 
 # Geospatial
-geo = "0.28"
+geo = "0.32"
 geojson = "0.24"
-proj = "0.27"
-shapefile = "0.5"
-wkt = "0.10"
+proj = "0.31"
+shapefile = "0.7"
+wkt = "0.11"
 rstar = "0.12"
-gpx = "0.9"
+gpx = "0.10"
 
 # Document formats
 pdf-extract = "0.7"
 docx-rs = "0.4"
 
 # XML parsing
-quick-xml = "0.31"
+quick-xml = "0.37"
 
 # Async runtime
-tokio = { version = "1.35", features = ["full"] }
+tokio = { version = "1.48", features = ["full"] }
 async-trait = "0.1"
 
 # CLI
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 console = "0.15"
-tabled = "0.15"
+tabled = "0.17"
 
 # HTTP
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["trace"] }
-reqwest = { version = "0.11", features = ["json"] }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # Testing
-proptest = "1.4"
+proptest = "1.6"
 
 # Date/Time
 chrono = { version = "0.4", features = ["serde"] }
