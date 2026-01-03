@@ -48,11 +48,7 @@ impl ChunkGenerator {
             });
         }
 
-        Ok(Self {
-            min_chunk_size,
-            max_chunk_size,
-            overlap,
-        })
+        Ok(Self { min_chunk_size, max_chunk_size, overlap })
     }
 
     /// Generate chunks from a dataset's features
@@ -101,17 +97,11 @@ impl ChunkGenerator {
             .filter(|s| !s.trim().is_empty());
 
         match (name, description) {
-            (Some(n), Some(d)) => {
-                Some(format!("{}: {}", n, d))
-            }
+            (Some(n), Some(d)) => Some(format!("{}: {}", n, d)),
             // Rule 3: If only "name", use it
-            (Some(n), None) => {
-                Some(n.to_string())
-            }
+            (Some(n), None) => Some(n.to_string()),
             // Rule 4: If only "description", use it
-            (None, Some(d)) => {
-                Some(d.to_string())
-            }
+            (None, Some(d)) => Some(d.to_string()),
             // Rule 5: No text to index
             (None, None) => None,
         }
@@ -267,10 +257,7 @@ mod tests {
         let mut props = HashMap::new();
         props.insert("content".to_string(), serde_json::json!("Content text"));
         props.insert("name".to_string(), serde_json::json!("Name text"));
-        props.insert(
-            "description".to_string(),
-            serde_json::json!("Description text"),
-        );
+        props.insert("description".to_string(), serde_json::json!("Description text"));
 
         let feature = create_test_feature(1, props);
         let text = generator.extract_text(&feature);
@@ -284,10 +271,7 @@ mod tests {
 
         let mut props = HashMap::new();
         props.insert("name".to_string(), serde_json::json!("Park Name"));
-        props.insert(
-            "description".to_string(),
-            serde_json::json!("A beautiful park"),
-        );
+        props.insert("description".to_string(), serde_json::json!("A beautiful park"));
 
         let feature = create_test_feature(1, props);
         let text = generator.extract_text(&feature);
@@ -313,10 +297,7 @@ mod tests {
         let generator = ChunkGenerator::default();
 
         let mut props = HashMap::new();
-        props.insert(
-            "description".to_string(),
-            serde_json::json!("Just a description"),
-        );
+        props.insert("description".to_string(), serde_json::json!("Just a description"));
 
         let feature = create_test_feature(1, props);
         let text = generator.extract_text(&feature);

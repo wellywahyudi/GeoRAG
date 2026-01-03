@@ -81,13 +81,27 @@ jobs:
           # Install SQLite3 via vcpkg
           vcpkg install sqlite3:x64-windows
 
+          # Download sqlite3 command-line tools
+          $sqliteUrl = "https://www.sqlite.org/2024/sqlite-tools-win-x64-3470200.zip"
+          $sqliteZip = "$env:TEMP\sqlite-tools.zip"
+          $sqliteDir = "$env:TEMP\sqlite-tools"
+
+          Invoke-WebRequest -Uri $sqliteUrl -OutFile $sqliteZip
+          Expand-Archive -Path $sqliteZip -DestinationPath $sqliteDir -Force
+
+          # Add sqlite3.exe to PATH
+          $sqliteExeDir = Get-ChildItem -Path $sqliteDir -Recurse -Filter "sqlite3.exe" | Select-Object -First 1 | Select-Object -ExpandProperty DirectoryName
+          echo "$sqliteExeDir" >> $env:GITHUB_PATH
+
           # Set environment variables for CMake to find SQLite3
           $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
           echo "SQLITE3_LIB_DIR=$vcpkgRoot\installed\x64-windows\lib" >> $env:GITHUB_ENV
           echo "SQLITE3_INCLUDE_DIR=$vcpkgRoot\installed\x64-windows\include" >> $env:GITHUB_ENV
           echo "CMAKE_PREFIX_PATH=$vcpkgRoot\installed\x64-windows" >> $env:GITHUB_ENV
-
-          # Add to PATH
           echo "$vcpkgRoot\installed\x64-windows\bin" >> $env:GITHUB_PATH
+
+          # Verify sqlite3 is available
+          Start-Sleep -Seconds 2
+          sqlite3 -version
       - name: Build
         run: cargo build --all --release --verbose
