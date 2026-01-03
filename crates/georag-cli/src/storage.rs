@@ -7,7 +7,9 @@ use std::sync::Arc;
 
 pub struct Storage {
     pub spatial: Arc<dyn SpatialStore>,
+    #[allow(dead_code)]
     pub vector: Arc<dyn VectorStore>,
+    #[allow(dead_code)]
     pub document: Arc<dyn DocumentStore>,
 }
 
@@ -46,6 +48,7 @@ impl Storage {
     }
 
     /// Check if storage has any data
+    #[allow(dead_code)]
     pub async fn is_empty(&self) -> Result<bool> {
         let datasets = self.spatial.list_datasets().await?;
         let chunk_ids = self.document.list_chunk_ids().await?;
@@ -53,6 +56,7 @@ impl Storage {
     }
 
     /// Clear all data (for --force rebuild)
+    #[allow(dead_code)]
     pub async fn clear(&self) -> Result<()> {
         // Clear all chunks
         let chunk_ids = self.document.list_chunk_ids().await?;

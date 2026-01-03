@@ -1,6 +1,10 @@
+pub mod chunk;
+
 use crate::error::{GeoragError, Result};
 use crate::models::{ChunkId, ChunkMetadata, ChunkSource, FeatureId, TextChunk};
 use std::collections::HashMap;
+
+pub use chunk::ChunkGenerator;
 
 #[derive(Debug, Clone)]
 pub struct ChunkConfig {

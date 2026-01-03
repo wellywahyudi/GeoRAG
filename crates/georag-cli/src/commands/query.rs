@@ -108,8 +108,7 @@ pub async fn execute(
             })
             .collect();
 
-        let explanation_text = if let Some(ref explanation) = result.explanation {
-            Some(format!(
+        let explanation_text = result.explanation.as_ref().map(|explanation| format!(
                 "Spatial Phase: {} features evaluated, {} matched. Semantic Phase: {}",
                 explanation.spatial_phase.features_evaluated,
                 explanation.spatial_phase.features_matched,
@@ -121,10 +120,7 @@ pub async fn execute(
                         s.candidates_reranked, s.embedder_model
                     ))
                     .unwrap_or_else(|| "Disabled".to_string())
-            ))
-        } else {
-            None
-        };
+            ));
 
         output.result(QueryOutput {
             query: args.query.clone(),

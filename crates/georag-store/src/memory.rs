@@ -32,7 +32,7 @@ impl MemorySpatialStore {
         feature_ids: Vec<FeatureId>,
     ) {
         let mut dataset_features = self.dataset_features.write().unwrap();
-        dataset_features.entry(dataset_id).or_insert_with(Vec::new).extend(feature_ids);
+        dataset_features.entry(dataset_id).or_default().extend(feature_ids);
     }
 }
 
