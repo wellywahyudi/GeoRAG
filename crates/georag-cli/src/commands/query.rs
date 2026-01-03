@@ -6,7 +6,10 @@ use anyhow::{bail, Context, Result};
 use georag_core::models::workspace::IndexState;
 use georag_core::models::WorkspaceConfig;
 use georag_geo::models::{Distance, DistanceUnit};
-use georag_retrieval::models::{QueryPlan, QueryResult, SourceReference};
+use georag_llm::ollama::OllamaEmbedder;
+use georag_retrieval::models::QueryPlan;
+use georag_retrieval::pipeline::RetrievalPipeline;
+use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -39,15 +42,15 @@ pub async fn execute(
     };
 
     // Create query plan
-    let _query_plan = QueryPlan::new(&args.query)
+    let query_plan = QueryPlan::new(&args.query)
         .with_semantic_rerank(!args.no_rerank)
         .with_top_k(args.top_k)
         .with_explain(explain);
 
-    let _query_plan = if let Some(filter) = spatial_filter.clone() {
-        _query_plan.with_spatial_filter(filter)
+    let query_plan = if let Some(filter) = spatial_filter.clone() {
+        query_plan.with_spatial_filter(filter)
     } else {
-        _query_plan
+        query_plan
     };
 
     // Display query plan
@@ -74,43 +77,37 @@ pub async fn execute(
     );
     output.kv("Top K", args.top_k);
 
-    // Simulate query execution (TODO: retrieval implementation)
+    // Execute query using RetrievalPipeline
     output.section("Executing Query");
 
-    let spatial_matches = 5;
-    output.info(format!("Found {} spatial matches", spatial_matches));
+    // Initialize embedder from index state
+    let embedder = OllamaEmbedder::localhost(&index_state.embedder, index_state.embedding_dim);
 
-    if !args.no_rerank {
-        output.info("Applying semantic reranking...");
-    }
+    // For now, use in-memory storage (TODO: support PostgreSQL)
+    // The issue is that RetrievalPipeline uses generic types, not trait objects
+    // We need concrete types here
+    let spatial_store = MemorySpatialStore::new();
+    let vector_store = MemoryVectorStore::new();
+    let document_store = MemoryDocumentStore::new();
 
-    let sources = vec![
-        SourceReference {
-            chunk_id: georag_core::models::ChunkId(1),
-            feature_id: Some(georag_core::models::FeatureId(1)),
-            document_path: "dataset-1.geojson".to_string(),
-            page: None,
-            excerpt: "This is a sample text excerpt from the first result...".to_string(),
-            score: 0.95,
-        },
-        SourceReference {
-            chunk_id: georag_core::models::ChunkId(2),
-            feature_id: Some(georag_core::models::FeatureId(2)),
-            document_path: "dataset-1.geojson".to_string(),
-            page: None,
-            excerpt: "Another relevant excerpt from the second result...".to_string(),
-            score: 0.87,
-        },
-    ];
-
-    let result = QueryResult::new(
-        "This is a generated answer based on the retrieved spatial features and documents.",
-        sources.clone(),
-        spatial_matches,
+    // Create retrieval pipeline with concrete types
+    let pipeline = RetrievalPipeline::new(
+        spatial_store,
+        vector_store,
+        document_store,
+        embedder,
     );
 
+    // Execute the query
+    let result = pipeline
+        .execute(&query_plan)
+        .await
+        .context("Failed to execute query")?;
+
+    // Display results
     if output.is_json() {
-        let result_items: Vec<QueryResultItem> = sources
+        let result_items: Vec<QueryResultItem> = result
+            .sources
             .iter()
             .map(|s| QueryResultItem {
                 content: s.excerpt.clone(),
@@ -119,10 +116,19 @@ pub async fn execute(
             })
             .collect();
 
-        let explanation_text = if explain {
+        let explanation_text = if let Some(ref explanation) = result.explanation {
             Some(format!(
-                "Spatial Phase: {} features evaluated, {} matched. Semantic Phase: Reranked {} candidates using {}",
-                spatial_matches + 10, spatial_matches, spatial_matches, index_state.embedder
+                "Spatial Phase: {} features evaluated, {} matched. Semantic Phase: {}",
+                explanation.spatial_phase.features_evaluated,
+                explanation.spatial_phase.features_matched,
+                explanation
+                    .semantic_phase
+                    .as_ref()
+                    .map(|s| format!(
+                        "Reranked {} candidates using {}",
+                        s.candidates_reranked, s.embedder_model
+                    ))
+                    .unwrap_or_else(|| "Disabled".to_string())
             ))
         } else {
             None
@@ -130,16 +136,22 @@ pub async fn execute(
 
         output.result(QueryOutput {
             query: args.query.clone(),
-            spatial_matches,
+            spatial_matches: result.spatial_matches,
             results: result_items,
             explanation: explanation_text,
         })?;
     } else {
+        output.info(format!("Found {} spatial matches", result.spatial_matches));
+
+        if !args.no_rerank {
+            output.info("Applied semantic reranking");
+        }
+
         output.section("Results");
         output.info(&result.answer);
 
         output.section("Sources");
-        for (i, source) in sources.iter().enumerate() {
+        for (i, source) in result.sources.iter().enumerate() {
             output.info(format!(
                 "\n{}. {} (score: {:.2})",
                 i + 1,
@@ -152,18 +164,38 @@ pub async fn execute(
             output.info(format!("  {}", source.excerpt));
         }
 
-        if explain {
+        if let Some(explanation) = result.explanation {
             output.section("Explanation");
             output.kv(
                 "Spatial Phase",
-                format!("{} features evaluated, {} matched", spatial_matches + 10, spatial_matches),
+                format!(
+                    "{} features evaluated, {} matched",
+                    explanation.spatial_phase.features_evaluated,
+                    explanation.spatial_phase.features_matched
+                ),
             );
-            output.kv(
-                "Semantic Phase",
-                format!("Reranked {} candidates using {}", spatial_matches, index_state.embedder),
-            );
-            output.kv("Embedding Model", &index_state.embedder);
-            output.kv("Embedding Dimension", index_state.embedding_dim);
+
+            if let Some(semantic) = explanation.semantic_phase {
+                output.kv(
+                    "Semantic Phase",
+                    format!(
+                        "Reranked {} candidates using {}",
+                        semantic.candidates_reranked, semantic.embedder_model
+                    ),
+                );
+                output.kv("Embedding Model", &semantic.embedder_model);
+                output.kv("Embedding Dimension", semantic.embedding_dim);
+                output.kv("Query Norm", format!("{:.3}", semantic.query_norm));
+            }
+
+            if !explanation.ranking_details.is_empty() {
+                output.section("Ranking Details");
+                for (i, detail) in explanation.ranking_details.iter().enumerate().take(5) {
+                    output.info(format!("\n{}. Chunk ID: {}", i + 1, detail.chunk_id.0));
+                    output.kv("  Final Score", format!("{:.3}", detail.final_score));
+                    output.info(format!("  {}", detail.score_explanation));
+                }
+            }
         }
     }
 
