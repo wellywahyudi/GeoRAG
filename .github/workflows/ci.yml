@@ -65,10 +65,29 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install sqlite3
       - name: Install system dependencies (Windows)
         if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          vcpkg install proj:x64-windows sqlite3:x64-windows
-          echo "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Install SQLite3 via vcpkg
+          vcpkg install sqlite3:x64-windows
+
+          # Set environment variables for CMake to find SQLite3
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          echo "SQLITE3_LIB_DIR=$vcpkgRoot\installed\x64-windows\lib" >> $env:GITHUB_ENV
+          echo "SQLITE3_INCLUDE_DIR=$vcpkgRoot\installed\x64-windows\include" >> $env:GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$vcpkgRoot\installed\x64-windows" >> $env:GITHUB_ENV
+
+          # Add to PATH
+          echo "$vcpkgRoot\installed\x64-windows\bin" >> $env:GITHUB_PATH
       - name: Build
         run: cargo build --all --release --verbose
