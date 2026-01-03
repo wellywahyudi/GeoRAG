@@ -100,8 +100,6 @@ jobs:
           echo "CMAKE_PREFIX_PATH=$vcpkgRoot\installed\x64-windows" >> $env:GITHUB_ENV
           echo "$vcpkgRoot\installed\x64-windows\bin" >> $env:GITHUB_PATH
 
-          # Verify sqlite3 is available
-          Start-Sleep -Seconds 2
-          sqlite3 -version
+          Write-Host "SQLite3 tools directory: $sqliteExeDir"
       - name: Build
         run: cargo build --all --release --verbose
