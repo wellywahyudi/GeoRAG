@@ -15,6 +15,7 @@ use crate::ports::{DocumentStore, SpatialStore, VectorStore};
 pub struct MemorySpatialStore {
     datasets: Arc<RwLock<HashMap<DatasetId, Dataset>>>,
     features: Arc<RwLock<HashMap<FeatureId, Feature>>>,
+    dataset_features: Arc<RwLock<HashMap<DatasetId, Vec<FeatureId>>>>,
     next_id: Arc<RwLock<u64>>,
 }
 
@@ -22,6 +23,16 @@ impl MemorySpatialStore {
     /// Create a new in-memory spatial store
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Associate features with a dataset
+    pub fn associate_features_with_dataset(
+        &self,
+        dataset_id: DatasetId,
+        feature_ids: Vec<FeatureId>,
+    ) {
+        let mut dataset_features = self.dataset_features.write().unwrap();
+        dataset_features.entry(dataset_id).or_insert_with(Vec::new).extend(feature_ids);
     }
 }
 
@@ -117,6 +128,18 @@ impl SpatialStore for MemorySpatialStore {
     async fn get_feature(&self, id: FeatureId) -> Result<Option<Feature>> {
         let features = self.features.read().unwrap();
         Ok(features.get(&id).cloned())
+    }
+
+    async fn get_features_for_dataset(&self, dataset_id: DatasetId) -> Result<Vec<Feature>> {
+        let dataset_features = self.dataset_features.read().unwrap();
+        let features = self.features.read().unwrap();
+
+        let feature_ids = dataset_features.get(&dataset_id);
+
+        match feature_ids {
+            Some(ids) => Ok(ids.iter().filter_map(|id| features.get(id).cloned()).collect()),
+            None => Ok(Vec::new()),
+        }
     }
 }
 

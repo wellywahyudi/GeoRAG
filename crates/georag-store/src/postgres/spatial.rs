@@ -430,4 +430,49 @@ impl SpatialStore for PostgresStore {
             None => Ok(None),
         }
     }
+
+    async fn get_features_for_dataset(&self, dataset_id: DatasetId) -> Result<Vec<Feature>> {
+        let dataset_uuid = Uuid::from_u128(dataset_id.0 as u128);
+
+        let rows = sqlx::query(
+            r#"
+            SELECT id, feature_id, ST_AsGeoJSON(geometry) as geometry, properties
+            FROM features
+            WHERE dataset_id = $1
+            "#,
+        )
+        .bind(dataset_uuid)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| {
+            GeoragError::Serialization(format!("Failed to get features for dataset: {}", e))
+        })?;
+
+        let features = rows
+            .into_iter()
+            .map(|row| {
+                let uuid: Uuid = row.get("id");
+                let id = FeatureId(uuid.as_u128() as u64);
+
+                let geometry_str: String = row.get("geometry");
+                let geometry: serde_json::Value =
+                    serde_json::from_str(&geometry_str).unwrap_or(serde_json::json!({}));
+
+                let properties: serde_json::Value = row.get("properties");
+                let properties_map = properties
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default();
+
+                Feature {
+                    id,
+                    geometry: Some(geometry),
+                    properties: properties_map,
+                    crs: 4326, // Default CRS
+                }
+            })
+            .collect();
+
+        Ok(features)
+    }
 }

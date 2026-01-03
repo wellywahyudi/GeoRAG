@@ -91,18 +91,10 @@ pub async fn execute(
     let document_store = MemoryDocumentStore::new();
 
     // Create retrieval pipeline with concrete types
-    let pipeline = RetrievalPipeline::new(
-        spatial_store,
-        vector_store,
-        document_store,
-        embedder,
-    );
+    let pipeline = RetrievalPipeline::new(spatial_store, vector_store, document_store, embedder);
 
     // Execute the query
-    let result = pipeline
-        .execute(&query_plan)
-        .await
-        .context("Failed to execute query")?;
+    let result = pipeline.execute(&query_plan).await.context("Failed to execute query")?;
 
     // Display results
     if output.is_json() {

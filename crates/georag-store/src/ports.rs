@@ -28,6 +28,9 @@ pub trait SpatialStore: Send + Sync {
 
     /// Get a specific feature by ID
     async fn get_feature(&self, id: FeatureId) -> Result<Option<Feature>>;
+
+    /// Get all features for a specific dataset
+    async fn get_features_for_dataset(&self, dataset_id: DatasetId) -> Result<Vec<Feature>>;
 }
 
 /// Port for vector storage and similarity search

@@ -7,9 +7,7 @@ use std::sync::Arc;
 
 pub struct Storage {
     pub spatial: Arc<dyn SpatialStore>,
-    #[allow(dead_code)]
     pub vector: Arc<dyn VectorStore>,
-    #[allow(dead_code)]
     pub document: Arc<dyn DocumentStore>,
 }
 
@@ -45,5 +43,29 @@ impl Storage {
             vector: store.clone(),
             document: store.clone(),
         })
+    }
+
+    /// Check if storage has any data
+    pub async fn is_empty(&self) -> Result<bool> {
+        let datasets = self.spatial.list_datasets().await?;
+        let chunk_ids = self.document.list_chunk_ids().await?;
+        Ok(datasets.is_empty() && chunk_ids.is_empty())
+    }
+
+    /// Clear all data (for --force rebuild)
+    pub async fn clear(&self) -> Result<()> {
+        // Clear all chunks
+        let chunk_ids = self.document.list_chunk_ids().await?;
+        if !chunk_ids.is_empty() {
+            self.document.delete_chunks(&chunk_ids).await?;
+        }
+
+        // Clear all embeddings
+        if !chunk_ids.is_empty() {
+            self.vector.delete_embeddings(&chunk_ids).await?;
+        }
+
+        // Only clear the derived data (chunks and embeddings)
+        Ok(())
     }
 }
