@@ -8,7 +8,10 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use georag_core::config::CliConfigOverrides;
 use georag_core::models::workspace::IndexState;
-use georag_core::models::DatasetMeta;
+use georag_core::processing::chunk::ChunkGenerator;
+use georag_llm::ollama::OllamaEmbedder;
+use georag_llm::ports::Embedder;
+use georag_retrieval::embedding::EmbeddingPipeline;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -42,6 +45,13 @@ pub async fn execute(
     if index_state_path.exists() && !args.force {
         output.info("Index already exists. Use --force to rebuild.");
         return Ok(());
+    }
+
+    // If force rebuild is requested, clear existing data
+    if args.force {
+        output.info("Force rebuild requested, clearing existing data...");
+        storage.clear().await?;
+        output.info("  Cleared existing chunks and embeddings");
     }
 
     if dry_run {
@@ -104,27 +114,107 @@ pub async fn execute(
     output.section("Validating geometries");
     output.info("  Fixed 0 invalid geometries");
 
+    output.section("Generating chunks");
+
+    // Create chunk generator
+    let chunk_generator = ChunkGenerator::default();
+    let mut all_chunks = Vec::new();
+
+    // Generate chunks from each dataset
+    for dataset_meta in &datasets {
+        // Get full dataset
+        let dataset = storage
+            .spatial
+            .get_dataset(dataset_meta.id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Dataset {} not found", dataset_meta.id.0))?;
+
+        // Get features for this dataset
+        let features = storage
+            .spatial
+            .get_features_for_dataset(dataset_meta.id)
+            .await?;
+
+        output.info(format!(
+            "  Processing dataset '{}' ({} features)",
+            dataset.name,
+            features.len()
+        ));
+
+        // Generate chunks
+        let chunks = chunk_generator.generate_chunks(&dataset, &features);
+        output.info(format!("    Generated {} chunks", chunks.len()));
+
+        all_chunks.extend(chunks);
+    }
+
+    let chunk_count = all_chunks.len();
+    output.info(format!("  Total chunks generated: {}", chunk_count));
+
     output.section("Generating embeddings");
 
-    let total_features: usize = datasets.iter().map(|d| d.feature_count).sum();
-    let chunk_count = total_features;
-    let embedding_dim = 768;
+    // Create embedder from config
+    let embedder = create_embedder(&config.embedder.value)?;
+    let embedding_dim = embedder.dimensions();
 
     output.info(format!("  Using embedder: {}", config.embedder.value));
     output.info(format!("  Processing {} chunks", chunk_count));
     output.info(format!("  Embedding dimension: {}", embedding_dim));
 
-    let index_hash = generate_index_hash(&datasets, config.crs.value, &config.embedder.value);
+    // Create embedding pipeline with batch size of 32
+    let pipeline = EmbeddingPipeline::new(embedder, 32);
+
+    // Generate embeddings with progress display
+    let mut embeddings = pipeline.generate_embeddings(
+        &all_chunks,
+        |current, total| {
+            output.info(format!("  Progress: {}/{} chunks", current, total));
+        },
+    )?;
+
+    // Attach spatial metadata to embeddings
+    output.info("  Attaching spatial metadata...");
+    for (chunk, embedding) in all_chunks.iter().zip(embeddings.iter_mut()) {
+        if let Some(feature_id) = chunk.spatial_ref {
+            if let Some(feature) = storage.spatial.get_feature(feature_id).await? {
+                // Extract bounding box from geometry
+                let bbox = extract_bbox_from_geometry(&feature.geometry);
+
+                embedding.spatial_metadata = Some(georag_core::models::SpatialMetadata {
+                    feature_id,
+                    crs: feature.crs,
+                    bbox,
+                });
+            }
+        }
+    }
+
+    output.info(format!("  Generated {} embeddings", embeddings.len()));
+
+    output.section("Storing data");
+
+    // Store chunks to document store
+    output.info("  Storing chunks...");
+    storage.document.store_chunks(&all_chunks).await?;
+    output.info(format!("    Stored {} chunks", all_chunks.len()));
+
+    // Store embeddings to vector store
+    output.info("  Storing embeddings...");
+    storage.vector.store_embeddings(&embeddings).await?;
+    output.info(format!("    Stored {} embeddings", embeddings.len()));
 
     output.section("Finalizing index");
+
+    // Generate hash from actual chunks and embeddings
+    let index_hash = generate_content_hash(&all_chunks, &embeddings);
     output.info(format!("  Index hash: {}", index_hash));
 
-    // Create index state
+    // Create index state with accurate metadata
     let index_state = IndexState {
         hash: index_hash.clone(),
         built_at: Utc::now(),
         embedder: config.embedder.value.clone(),
-        chunk_count,
+        chunk_count: all_chunks.len(),
         embedding_dim,
     };
 
@@ -139,7 +229,7 @@ pub async fn execute(
     if output.is_json() {
         let json_output = BuildOutput {
             index_hash: index_hash.clone(),
-            chunk_count,
+            chunk_count: all_chunks.len(),
             embedding_dim,
             embedder: config.embedder.value.clone(),
             normalized_count,
@@ -150,7 +240,7 @@ pub async fn execute(
         output.success("Index built successfully");
         output.section("Index Information");
         output.kv("Hash", &index_hash);
-        output.kv("Chunks", chunk_count);
+        output.kv("Chunks", all_chunks.len());
         output.kv("Embedding Dimension", embedding_dim);
         output.kv("Embedder", &config.embedder.value);
     }
@@ -158,26 +248,132 @@ pub async fn execute(
     Ok(())
 }
 
-/// Generate a deterministic hash for the index
-fn generate_index_hash(datasets: &[DatasetMeta], crs: u32, embedder: &str) -> String {
+/// Parse embedder string and create an OllamaEmbedder
+/// Format: "ollama:model-name" or just "model-name"
+fn create_embedder(embedder_str: &str) -> Result<OllamaEmbedder> {
+    // Parse the embedder string
+    let model = if let Some(stripped) = embedder_str.strip_prefix("ollama:") {
+        stripped
+    } else {
+        embedder_str
+    };
+
+    // Determine dimensions based on known models
+    let dimensions = match model {
+        "nomic-embed-text" => 768,
+        "mxbai-embed-large" => 1024,
+        "all-minilm" => 384,
+        _ => 768, // Default to 768 for unknown models
+    };
+
+    Ok(OllamaEmbedder::localhost(model, dimensions))
+}
+
+/// Generate hash from chunks and embeddings for index state
+fn generate_content_hash(
+    chunks: &[georag_core::models::TextChunk],
+    embeddings: &[georag_core::models::Embedding],
+) -> String {
     let mut hasher = DefaultHasher::new();
 
-    // Hash configuration
-    crs.hash(&mut hasher);
+    // Hash chunk count and content
+    chunks.len().hash(&mut hasher);
+    for chunk in chunks {
+        chunk.id.0.hash(&mut hasher);
+        chunk.content.hash(&mut hasher);
+    }
 
-    // Hash embedder
-    embedder.hash(&mut hasher);
-
-    // Hash datasets (sorted by ID for determinism)
-    let mut sorted_datasets = datasets.to_vec();
-    sorted_datasets.sort_by_key(|d| d.id.0);
-
-    for dataset in sorted_datasets {
-        dataset.id.0.hash(&mut hasher);
-        dataset.name.hash(&mut hasher);
-        dataset.feature_count.hash(&mut hasher);
-        dataset.crs.hash(&mut hasher);
+    // Hash embedding count and dimensions
+    embeddings.len().hash(&mut hasher);
+    if let Some(first_embedding) = embeddings.first() {
+        first_embedding.vector.len().hash(&mut hasher);
     }
 
     format!("{:x}", hasher.finish())
+}
+
+/// Extract bounding box from GeoJSON-like geometry
+fn extract_bbox_from_geometry(geometry: &Option<serde_json::Value>) -> Option<[f64; 4]> {
+    let geom = geometry.as_ref()?;
+
+    // Try to extract coordinates from the geometry
+    let coords = geom.get("coordinates")?;
+
+    // Handle different geometry types
+    match geom.get("type")?.as_str()? {
+        "Point" => {
+            // For Point: coordinates are [x, y]
+            let arr = coords.as_array()?;
+            if arr.len() >= 2 {
+                let x = arr[0].as_f64()?;
+                let y = arr[1].as_f64()?;
+                Some([x, y, x, y])
+            } else {
+                None
+            }
+        }
+        "LineString" | "MultiPoint" => {
+            // For LineString/MultiPoint: coordinates are [[x, y], ...]
+            let points = coords.as_array()?;
+            compute_bbox_from_points(points)
+        }
+        "Polygon" | "MultiLineString" => {
+            // For Polygon/MultiLineString: coordinates are [[[x, y], ...], ...]
+            let rings = coords.as_array()?;
+            let mut all_points = Vec::new();
+            for ring in rings {
+                if let Some(points) = ring.as_array() {
+                    all_points.extend_from_slice(points);
+                }
+            }
+            compute_bbox_from_points(&all_points)
+        }
+        "MultiPolygon" => {
+            // For MultiPolygon: coordinates are [[[[x, y], ...], ...], ...]
+            let polygons = coords.as_array()?;
+            let mut all_points = Vec::new();
+            for polygon in polygons {
+                if let Some(rings) = polygon.as_array() {
+                    for ring in rings {
+                        if let Some(points) = ring.as_array() {
+                            all_points.extend_from_slice(points);
+                        }
+                    }
+                }
+            }
+            compute_bbox_from_points(&all_points)
+        }
+        _ => None,
+    }
+}
+
+/// Compute bounding box from an array of coordinate points
+fn compute_bbox_from_points(points: &[serde_json::Value]) -> Option<[f64; 4]> {
+    if points.is_empty() {
+        return None;
+    }
+
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+
+    for point in points {
+        let arr = point.as_array()?;
+        if arr.len() >= 2 {
+            let x = arr[0].as_f64()?;
+            let y = arr[1].as_f64()?;
+
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+        }
+    }
+
+    if min_x.is_finite() && min_y.is_finite() && max_x.is_finite() && max_y.is_finite() {
+        Some([min_x, min_y, max_x, max_y])
+    } else {
+        None
+    }
 }
