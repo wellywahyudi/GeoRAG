@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::models::{
-    ChunkId, Dataset, DatasetId, DatasetMeta, Embedding, Feature, ScoredResult, SpatialFilter,
-    TextChunk,
+    ChunkId, Dataset, DatasetId, DatasetMeta, Embedding, Feature, FeatureId, ScoredResult,
+    SpatialFilter, TextChunk,
 };
 
 /// Port for spatial data storage operations
@@ -17,6 +17,12 @@ pub trait SpatialStore {
 
     /// Execute a spatial query with filters
     fn spatial_query(&self, filter: &SpatialFilter) -> Result<Vec<Feature>>;
+
+    /// Get a feature by ID
+    fn get_feature(&self, id: FeatureId) -> Result<Option<Feature>>;
+
+    /// Get all features for a dataset
+    fn get_features_for_dataset(&self, dataset_id: DatasetId) -> Result<Vec<Feature>>;
 }
 
 /// Port for vector embedding storage and similarity search
