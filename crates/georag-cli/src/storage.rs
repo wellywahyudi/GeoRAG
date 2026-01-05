@@ -36,9 +36,7 @@ fn parse_database_url(url: &str) -> (String, String, String) {
 
 pub struct Storage {
     pub spatial: Arc<dyn SpatialStore>,
-    #[allow(dead_code)]
     pub vector: Arc<dyn VectorStore>,
-    #[allow(dead_code)]
     pub document: Arc<dyn DocumentStore>,
 }
 
@@ -106,7 +104,6 @@ impl Storage {
     }
 
     /// Clear all data (for --force rebuild)
-    #[allow(dead_code)]
     pub async fn clear(&self) -> Result<()> {
         // Clear all chunks
         let chunk_ids = self.document.list_chunk_ids().await?;

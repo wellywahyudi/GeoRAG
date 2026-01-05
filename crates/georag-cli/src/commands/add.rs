@@ -106,7 +106,6 @@ async fn execute_batch(
                     summary.add_success(FileProcessingResult {
                         path: file.path.clone(),
                         format_name: file.format_name.clone(),
-                        success: true,
                         error: None,
                         dataset_name: Some(
                             file.path
@@ -121,7 +120,6 @@ async fn execute_batch(
                     summary.add_failure(FileProcessingResult {
                         path: file.path.clone(),
                         format_name: file.format_name.clone(),
-                        success: false,
                         error: Some(e.to_string()),
                         dataset_name: None,
                     });
@@ -148,7 +146,6 @@ async fn execute_batch(
                     summary.add_success(FileProcessingResult {
                         path: file.path.clone(),
                         format_name: file.format_name.clone(),
-                        success: true,
                         error: None,
                         dataset_name: Some(
                             file.path
@@ -163,7 +160,6 @@ async fn execute_batch(
                     summary.add_failure(FileProcessingResult {
                         path: file.path.clone(),
                         format_name: file.format_name.clone(),
-                        success: false,
                         error: Some(e.to_string()),
                         dataset_name: None,
                     });

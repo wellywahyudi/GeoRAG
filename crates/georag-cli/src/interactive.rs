@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Select};
 use std::path::PathBuf;
@@ -153,6 +151,7 @@ pub struct InteractiveInitResult {
 }
 
 /// Interactive query builder
+#[allow(dead_code)]
 pub fn interactive_query() -> Result<InteractiveQueryResult> {
     println!("\n🔍 Query Builder\n");
 
@@ -244,6 +243,7 @@ pub fn interactive_query() -> Result<InteractiveQueryResult> {
 }
 
 /// Result from interactive query
+#[allow(dead_code)]
 pub struct InteractiveQueryResult {
     pub query: String,
     pub spatial_predicate: Option<String>,

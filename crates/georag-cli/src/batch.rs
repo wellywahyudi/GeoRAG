@@ -22,8 +22,6 @@ pub struct DiscoveredFile {
 pub struct FileProcessingResult {
     pub path: PathBuf,
     pub format_name: String,
-    #[allow(dead_code)]
-    pub success: bool,
     pub error: Option<String>,
     pub dataset_name: Option<String>,
 }
@@ -249,7 +247,6 @@ mod tests {
         summary.add_success(FileProcessingResult {
             path: PathBuf::from("test.geojson"),
             format_name: "GeoJSON".to_string(),
-            success: true,
             error: None,
             dataset_name: Some("test".to_string()),
         });
@@ -265,7 +262,6 @@ mod tests {
         summary.add_failure(FileProcessingResult {
             path: PathBuf::from("test.geojson"),
             format_name: "GeoJSON".to_string(),
-            success: false,
             error: Some("Invalid file".to_string()),
             dataset_name: None,
         });
@@ -283,7 +279,6 @@ mod tests {
         summary.add_success(FileProcessingResult {
             path: PathBuf::from("test1.geojson"),
             format_name: "GeoJSON".to_string(),
-            success: true,
             error: None,
             dataset_name: Some("test1".to_string()),
         });
@@ -292,7 +287,6 @@ mod tests {
         summary.add_success(FileProcessingResult {
             path: PathBuf::from("test2.geojson"),
             format_name: "GeoJSON".to_string(),
-            success: true,
             error: None,
             dataset_name: Some("test2".to_string()),
         });
@@ -301,7 +295,6 @@ mod tests {
         summary.add_failure(FileProcessingResult {
             path: PathBuf::from("test.shp"),
             format_name: "Shapefile".to_string(),
-            success: false,
             error: Some("Missing .dbf file".to_string()),
             dataset_name: None,
         });
@@ -310,7 +303,6 @@ mod tests {
         summary.add_success(FileProcessingResult {
             path: PathBuf::from("doc.pdf"),
             format_name: "PDF".to_string(),
-            success: true,
             error: None,
             dataset_name: Some("doc".to_string()),
         });
