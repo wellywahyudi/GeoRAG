@@ -3,6 +3,7 @@ use georag_core::models::{ChunkId, ScoredResult, TextChunk};
 use georag_llm::ports::Embedder;
 use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::models::{
     QueryExplanation, QueryPlan, QueryResult, RankingDetail, SemanticPhaseExplanation,
@@ -10,28 +11,27 @@ use crate::models::{
 };
 
 /// Retrieval pipeline orchestrating spatial and semantic search
-pub struct RetrievalPipeline<S, V, D, E>
+pub struct RetrievalPipeline<E>
 where
-    S: SpatialStore,
-    V: VectorStore,
-    D: DocumentStore,
     E: Embedder,
 {
-    spatial_store: S,
-    vector_store: V,
-    document_store: D,
+    spatial_store: Arc<dyn SpatialStore>,
+    vector_store: Arc<dyn VectorStore>,
+    document_store: Arc<dyn DocumentStore>,
     embedder: E,
 }
 
-impl<S, V, D, E> RetrievalPipeline<S, V, D, E>
+impl<E> RetrievalPipeline<E>
 where
-    S: SpatialStore,
-    V: VectorStore,
-    D: DocumentStore,
     E: Embedder,
 {
     /// Create a new retrieval pipeline
-    pub fn new(spatial_store: S, vector_store: V, document_store: D, embedder: E) -> Self {
+    pub fn new(
+        spatial_store: Arc<dyn SpatialStore>,
+        vector_store: Arc<dyn VectorStore>,
+        document_store: Arc<dyn DocumentStore>,
+        embedder: E,
+    ) -> Self {
         Self {
             spatial_store,
             vector_store,
@@ -206,6 +206,28 @@ where
         let mut sources = Vec::new();
         for result in results {
             if let Some(chunk) = chunk_map.get(&result.chunk_id) {
+                if chunk.source.document_path.is_empty() {
+                    return Err(GeoragError::FormatError {
+                        format: "chunk".to_string(),
+                        message: format!("Chunk {} has empty document_path", chunk.id.0),
+                    });
+                }
+                if chunk.content.is_empty() {
+                    return Err(GeoragError::FormatError {
+                        format: "chunk".to_string(),
+                        message: format!("Chunk {} has empty content", chunk.id.0),
+                    });
+                }
+                if !(0.0..=1.0).contains(&result.score) {
+                    return Err(GeoragError::FormatError {
+                        format: "score".to_string(),
+                        message: format!(
+                            "Chunk {} has invalid score: {} (must be between 0.0 and 1.0)",
+                            chunk.id.0, result.score
+                        ),
+                    });
+                }
+
                 sources.push(SourceReference {
                     chunk_id: chunk.id,
                     feature_id: chunk.spatial_ref,

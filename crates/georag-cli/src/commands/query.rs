@@ -9,7 +9,6 @@ use georag_geo::models::{Distance, DistanceUnit};
 use georag_llm::ollama::OllamaEmbedder;
 use georag_retrieval::models::QueryPlan;
 use georag_retrieval::pipeline::RetrievalPipeline;
-use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,7 +16,7 @@ pub async fn execute(
     args: QueryArgs,
     output: &OutputWriter,
     explain: bool,
-    _storage: &Storage,
+    storage: &Storage,
 ) -> Result<()> {
     // Find workspace root
     let workspace_root = find_workspace_root()?;
@@ -81,16 +80,16 @@ pub async fn execute(
     output.section("Executing Query");
 
     // Initialize embedder from index state
+    output.info(format!("Using embedder: {}", index_state.embedder));
     let embedder = OllamaEmbedder::localhost(&index_state.embedder, index_state.embedding_dim);
 
-    // For now, use in-memory storage (TODO: support PostgreSQL)
-    // The issue is that RetrievalPipeline uses generic types, not trait objects
-    // We need concrete types here
-    let spatial_store = MemorySpatialStore::new();
-    let vector_store = MemoryVectorStore::new();
-    let document_store = MemoryDocumentStore::new();
+    // Use the persisted storage passed from CLI
+    // Clone the Arc references to pass to the pipeline
+    let spatial_store = storage.spatial.clone();
+    let vector_store = storage.vector.clone();
+    let document_store = storage.document.clone();
 
-    // Create retrieval pipeline with concrete types
+    // Create retrieval pipeline with trait objects
     let pipeline = RetrievalPipeline::new(spatial_store, vector_store, document_store, embedder);
 
     // Execute the query
