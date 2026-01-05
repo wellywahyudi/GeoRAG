@@ -130,10 +130,7 @@ pub async fn execute(
             .ok_or_else(|| anyhow::anyhow!("Dataset {} not found", dataset_meta.id.0))?;
 
         // Get features for this dataset
-        let features = storage
-            .spatial
-            .get_features_for_dataset(dataset_meta.id)
-            .await?;
+        let features = storage.spatial.get_features_for_dataset(dataset_meta.id).await?;
 
         output.info(format!(
             "  Processing dataset '{}' ({} features)",
@@ -165,12 +162,9 @@ pub async fn execute(
     let pipeline = EmbeddingPipeline::new(embedder, 32);
 
     // Generate embeddings with progress display
-    let mut embeddings = pipeline.generate_embeddings(
-        &all_chunks,
-        |current, total| {
-            output.info(format!("  Progress: {}/{} chunks", current, total));
-        },
-    )?;
+    let mut embeddings = pipeline.generate_embeddings(&all_chunks, |current, total| {
+        output.info(format!("  Progress: {}/{} chunks", current, total));
+    })?;
 
     // Attach spatial metadata to embeddings
     output.info("  Attaching spatial metadata...");

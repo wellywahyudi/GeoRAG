@@ -111,11 +111,7 @@ impl<E: Embedder> EmbeddingPipeline<E> {
                         // Extract bounding box from geometry
                         let bbox = extract_bbox(&feature.geometry);
 
-                        Some(SpatialMetadata {
-                            feature_id,
-                            crs: feature.crs,
-                            bbox,
-                        })
+                        Some(SpatialMetadata { feature_id, crs: feature.crs, bbox })
                     } else {
                         None
                     }
