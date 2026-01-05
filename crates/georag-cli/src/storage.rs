@@ -5,6 +5,35 @@ use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
 use georag_store::postgres::{PostgresConfig, PostgresStore};
 use std::sync::Arc;
 
+/// Parse database URL to extract connection details for error messages
+fn parse_database_url(url: &str) -> (String, String, String) {
+    // Try to parse postgresql://user:pass@host:port/database format
+    let host = url
+        .split('@')
+        .nth(1)
+        .and_then(|s| s.split('/').next())
+        .and_then(|s| s.split(':').next())
+        .unwrap_or("localhost")
+        .to_string();
+
+    let port = url
+        .split('@')
+        .nth(1)
+        .and_then(|s| s.split('/').next())
+        .and_then(|s| s.split(':').nth(1))
+        .unwrap_or("5432")
+        .to_string();
+
+    let database = url
+        .split('/')
+        .next_back()
+        .and_then(|s| s.split('?').next())
+        .unwrap_or("georag")
+        .to_string();
+
+    (host, port, database)
+}
+
 pub struct Storage {
     pub spatial: Arc<dyn SpatialStore>,
     #[allow(dead_code)]
@@ -35,9 +64,30 @@ impl Storage {
         let config = PostgresConfig::from_env().context(
             "Failed to load PostgreSQL configuration. Set DATABASE_URL environment variable.",
         )?;
-        let store = PostgresStore::with_migrations(config)
-            .await
-            .context("Failed to connect to PostgreSQL database")?;
+
+        let store = PostgresStore::with_migrations(config.clone()).await.map_err(|e| {
+            // Parse connection details from DATABASE_URL for better error messages
+            let (host, port, database) = parse_database_url(&config.database_url);
+
+            anyhow::anyhow!(
+                "Failed to connect to PostgreSQL\n\n\
+                    Connection details:\n\
+                      Host: {}\n\
+                      Port: {}\n\
+                      Database: {}\n\n\
+                    Remediation:\n\
+                      1. Ensure PostgreSQL is running\n\
+                      2. Check DATABASE_URL environment variable\n\
+                      3. Verify credentials and database exists\n\
+                      4. Test connection: psql {}\n\n\
+                    Error: {}",
+                host,
+                port,
+                database,
+                config.database_url,
+                e
+            )
+        })?;
         let store = Arc::new(store);
 
         Ok(Self {

@@ -93,7 +93,25 @@ pub async fn execute(
     let pipeline = RetrievalPipeline::new(spatial_store, vector_store, document_store, embedder);
 
     // Execute the query
-    let result = pipeline.execute(&query_plan).await.context("Failed to execute query")?;
+    let result = pipeline.execute(&query_plan).await.map_err(|e| {
+        // Enhance error message for Ollama connection issues
+        if e.to_string().contains("Failed to connect to Ollama")
+            || e.to_string().contains("Embedder unavailable")
+        {
+            anyhow::anyhow!(
+                "Failed to connect to Ollama at http://localhost:11434\n\n\
+                Remediation:\n\
+                  1. Ensure Ollama is running: ollama serve\n\
+                  2. Verify the model is available: ollama list\n\
+                  3. Pull the model if needed: ollama pull {}\n\n\
+                Error: {}",
+                index_state.embedder,
+                e
+            )
+        } else {
+            anyhow::anyhow!("Failed to execute query: {}", e)
+        }
+    })?;
 
     // Display results
     if output.is_json() {
@@ -218,7 +236,11 @@ fn load_workspace_config(georag_dir: &Path) -> Result<WorkspaceConfig> {
 fn load_index_state(georag_dir: &Path) -> Result<IndexState> {
     let state_path = georag_dir.join("index").join("state.json");
     if !state_path.exists() {
-        bail!("Index not built. Run 'georag build' first.");
+        bail!(
+            "Index not built. Run 'georag build' first.\n\n\
+            The index contains embeddings needed for semantic search.\n\
+            Build it with: georag build --embedder ollama:nomic-embed-text"
+        );
     }
 
     let content = fs::read_to_string(&state_path)?;

@@ -151,7 +151,25 @@ pub async fn execute(
     output.section("Generating embeddings");
 
     // Create embedder from config
-    let embedder = create_embedder(&config.embedder.value)?;
+    let embedder = create_embedder(&config.embedder.value).map_err(|e| {
+        // Enhance error message for Ollama connection issues
+        if e.to_string().contains("Failed to connect to Ollama")
+            || e.to_string().contains("Embedder unavailable")
+        {
+            anyhow::anyhow!(
+                "Failed to connect to Ollama at http://localhost:11434\n\n\
+                Remediation:\n\
+                  1. Ensure Ollama is running: ollama serve\n\
+                  2. Pull the embedding model: ollama pull {}\n\
+                  3. Verify with: ollama list\n\n\
+                Error: {}",
+                config.embedder.value.strip_prefix("ollama:").unwrap_or(&config.embedder.value),
+                e
+            )
+        } else {
+            e
+        }
+    })?;
     let embedding_dim = embedder.dimensions();
 
     output.info(format!("  Using embedder: {}", config.embedder.value));
@@ -162,9 +180,29 @@ pub async fn execute(
     let pipeline = EmbeddingPipeline::new(embedder, 32);
 
     // Generate embeddings with progress display
-    let mut embeddings = pipeline.generate_embeddings(&all_chunks, |current, total| {
-        output.info(format!("  Progress: {}/{} chunks", current, total));
-    })?;
+    let mut embeddings = pipeline
+        .generate_embeddings(&all_chunks, |current, total| {
+            output.info(format!("  Progress: {}/{} chunks", current, total));
+        })
+        .map_err(|e| {
+            // Enhance error message for embedding generation failures
+            if e.to_string().contains("Failed to connect to Ollama")
+                || e.to_string().contains("Embedder unavailable")
+            {
+                anyhow::anyhow!(
+                    "Failed to generate embeddings using Ollama at http://localhost:11434\n\n\
+                Remediation:\n\
+                  1. Ensure Ollama is running: ollama serve\n\
+                  2. Verify the model is available: ollama list\n\
+                  3. Pull the model if needed: ollama pull {}\n\n\
+                Error: {}",
+                    config.embedder.value.strip_prefix("ollama:").unwrap_or(&config.embedder.value),
+                    e
+                )
+            } else {
+                anyhow::anyhow!("Failed to generate embeddings: {}", e)
+            }
+        })?;
 
     // Attach spatial metadata to embeddings
     output.info("  Attaching spatial metadata...");
