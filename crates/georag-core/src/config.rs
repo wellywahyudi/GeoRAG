@@ -113,22 +113,34 @@ impl LayeredConfig {
     pub fn load_from_env(mut self) -> Self {
         // GEORAG_CRS
         if let Ok(crs_str) = env::var("GEORAG_CRS") {
-            if let Ok(crs) = crs_str.parse::<u32>() {
-                self.crs.update(crs, ConfigSource::Environment);
+            match crs_str.parse::<u32>() {
+                Ok(crs) => self.crs.update(crs, ConfigSource::Environment),
+                Err(_) => tracing::warn!(
+                    "Invalid GEORAG_CRS value '{}': expected integer EPSG code",
+                    crs_str
+                ),
             }
         }
 
         // GEORAG_DISTANCE_UNIT
         if let Ok(unit_str) = env::var("GEORAG_DISTANCE_UNIT") {
-            if let Ok(unit) = parse_distance_unit(&unit_str) {
-                self.distance_unit.update(unit, ConfigSource::Environment);
+            match parse_distance_unit(&unit_str) {
+                Ok(unit) => self.distance_unit.update(unit, ConfigSource::Environment),
+                Err(_) => tracing::warn!(
+                    "Invalid GEORAG_DISTANCE_UNIT value '{}': expected meters, kilometers, miles, or feet",
+                    unit_str
+                ),
             }
         }
 
         // GEORAG_GEOMETRY_VALIDITY
         if let Ok(validity_str) = env::var("GEORAG_GEOMETRY_VALIDITY") {
-            if let Ok(validity) = parse_validity_mode(&validity_str) {
-                self.geometry_validity.update(validity, ConfigSource::Environment);
+            match parse_validity_mode(&validity_str) {
+                Ok(validity) => self.geometry_validity.update(validity, ConfigSource::Environment),
+                Err(_) => tracing::warn!(
+                    "Invalid GEORAG_GEOMETRY_VALIDITY value '{}': expected strict or lenient",
+                    validity_str
+                ),
             }
         }
 

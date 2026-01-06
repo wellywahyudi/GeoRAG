@@ -392,17 +392,11 @@ impl ShapefileFormatReader {
                     "coordinates": coordinates
                 }))
             }
-            Shape::Multipatch(_) => {
-                // Multipatch is a complex 3D shape type, not commonly used
-                Err(GeoragError::FormatError {
-                    format: "Shapefile".to_string(),
-                    message: "Multipatch geometry type is not supported".to_string(),
-                })
-            }
-            Shape::NullShape => {
-                // Null shape - no geometry
-                Ok(serde_json::Value::Null)
-            }
+            Shape::Multipatch(_) => Err(GeoragError::FormatError {
+                format: "Shapefile".to_string(),
+                message: "Multipatch geometry type is not supported".to_string(),
+            }),
+            Shape::NullShape => Ok(serde_json::Value::Null),
         }
     }
 

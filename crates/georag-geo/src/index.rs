@@ -36,7 +36,10 @@ impl IndexedGeometry {
                 AABB::from_corners([min.x, min.y], [max.x, max.y])
             }
             None => {
-                // No bounding box (e.g., empty geometry), use a point at origin
+                // Empty/point geometries have no bounding rect. Use origin as a
+                // degenerate envelope. Note: this may cause false positives in
+                // queries near (0,0) for geographic CRS. Consider filtering by
+                // geometry validity upstream.
                 AABB::from_point([0.0, 0.0])
             }
         }

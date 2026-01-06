@@ -184,8 +184,7 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
     Ok(transformed)
 }
 
-/// Normalize a geometry to a target CRS
-/// This is an alias for reproject_geometry with clearer intent
+/// Alias for [`reproject_geometry`] with domain-specific naming.
 pub fn normalize_geometry(
     geometry: &Geometry,
     from_crs: &Crs,

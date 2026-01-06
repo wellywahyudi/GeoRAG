@@ -9,7 +9,10 @@ use crate::formats::{
     FormatDataset, FormatFeature, FormatMetadata, FormatReader, FormatValidation,
 };
 
-/// GeoJSON format reader
+/// GeoJSON format reader.
+///
+/// Per RFC 7946, GeoJSON coordinates use WGS84 (EPSG:4326). Legacy CRS members
+/// are parsed if present, but files without explicit CRS default to 4326.
 pub struct GeoJsonReader;
 
 #[async_trait]

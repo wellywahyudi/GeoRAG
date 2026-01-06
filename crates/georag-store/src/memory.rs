@@ -1,3 +1,9 @@
+//! In-memory storage implementations for development and testing.
+//!
+//! These implementations use `RwLock::unwrap()` intentionally. Lock poisoning
+//! only occurs when another thread panicked while holding the lock, which is
+//! an unrecoverable state. For production workloads, use the PostgreSQL backend.
+
 use async_trait::async_trait;
 use georag_core::error::Result;
 use georag_core::models::query::{DistanceUnit, SpatialPredicate};

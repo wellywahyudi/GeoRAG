@@ -43,7 +43,6 @@ pub trait FormatReader: Send + Sync {
         path: &Path,
         _options: &FormatOptions,
     ) -> Result<FormatDataset> {
-        // Default implementation: ignore options and read normally
         self.read(path).await
     }
 

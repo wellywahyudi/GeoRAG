@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use georag_core::formats::{
     docx::DocxReader, geojson::GeoJsonReader, gpx::GpxReader, kml::KmlReader, pdf::PdfReader,
-    shapefile::ShapefileFormatReader, FormatRegistry,
+    shapefile::ShapefileFormatReader, FormatFeature, FormatRegistry,
 };
 use georag_core::models::dataset::GeometryType;
 use georag_core::models::{Dataset, DatasetId};
@@ -256,8 +256,10 @@ async fn execute_single(
             .context("Failed to read dataset")?
     };
 
-    // Read and validate the dataset metadata (for backward compatibility)
-    let (geometry_type, feature_count, crs) = read_dataset_metadata(&args.path)?;
+    // Extract metadata from the parsed format dataset
+    let geometry_type = detect_geometry_type(&format_dataset.features);
+    let feature_count = format_dataset.features.len();
+    let crs = format_dataset.crs;
 
     // Check for CRS mismatch
     if crs != config.crs && !args.force {
@@ -413,7 +415,27 @@ fn find_workspace_root() -> Result<PathBuf> {
     }
 }
 
+/// Detect geometry type from parsed features
+fn detect_geometry_type(features: &[FormatFeature]) -> GeometryType {
+    features
+        .first()
+        .and_then(|f| f.geometry.as_ref())
+        .and_then(|g| g.get("type"))
+        .and_then(|t| t.as_str())
+        .map(|t| match t {
+            "Point" => GeometryType::Point,
+            "LineString" => GeometryType::LineString,
+            "Polygon" => GeometryType::Polygon,
+            "MultiPoint" => GeometryType::MultiPoint,
+            "MultiLineString" => GeometryType::MultiLineString,
+            "MultiPolygon" => GeometryType::MultiPolygon,
+            _ => GeometryType::GeometryCollection,
+        })
+        .unwrap_or(GeometryType::Point)
+}
+
 /// Read dataset metadata from a GeoJSON file
+#[allow(dead_code)]
 fn read_dataset_metadata(path: &Path) -> Result<(GeometryType, usize, u32)> {
     // Read the file
     let content = fs::read_to_string(path).context("Failed to read dataset file")?;
