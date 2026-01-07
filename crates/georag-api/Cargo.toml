@@ -6,16 +6,40 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "georag-api"
+path = "src/main.rs"
+
 [dependencies]
 georag-core = { path = "../georag-core" }
 georag-retrieval = { path = "../georag-retrieval" }
-axum.workspace = true
+georag-store = { path = "../georag-store" }
+georag-llm = { path = "../georag-llm" }
+
+# HTTP Framework
+axum = { workspace = true, features = ["multipart"] }
 tower.workspace = true
 tower-http.workspace = true
 tokio.workspace = true
+
+# Serialization
 serde.workspace = true
 serde_json.workspace = true
+geojson.workspace = true
+
+# Error Handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Async
+async-trait.workspace = true
+
+# Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+# File handling
+tempfile = "3.14"
+chrono.workspace = true
 
 [dev-dependencies]

@@ -1,5 +1,5 @@
-//! GeoRAG API - HTTP adapter
-//!
-//! This crate provides an HTTP API adapter using Axum.
+pub mod routes;
+pub mod state;
 
-pub mod handlers;
+pub use routes::create_router;
+pub use state::{AppState, EmbedderConfig};
