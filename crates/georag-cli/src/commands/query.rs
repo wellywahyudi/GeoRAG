@@ -265,8 +265,9 @@ fn parse_spatial_filter(
         "intersects" => SpatialPredicate::Intersects,
         "contains" => SpatialPredicate::Contains,
         "bbox" | "boundingbox" => SpatialPredicate::BoundingBox,
+        "dwithin" | "distance" | "near" => SpatialPredicate::DWithin,
         _ => bail!(
-            "Invalid spatial predicate: {}. Use within, intersects, contains, or bbox",
+            "Invalid spatial predicate: {}. Use within, intersects, contains, bbox, or dwithin",
             predicate_str
         ),
     };

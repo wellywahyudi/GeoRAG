@@ -166,10 +166,16 @@ impl Geometry {
 /// Spatial predicate for filtering
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SpatialPredicate {
+    /// Geometry is completely within the filter geometry
     Within,
+    /// Geometry intersects (overlaps) the filter geometry
     Intersects,
+    /// Geometry contains the filter geometry
     Contains,
+    /// Bounding boxes intersect (fast approximation)
     BoundingBox,
+    /// Geometry is within specified distance of filter geometry (geodesic)
+    DWithin,
 }
 
 /// Distance with unit

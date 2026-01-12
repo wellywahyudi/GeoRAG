@@ -93,6 +93,7 @@ pub enum SpatialPredicate {
     Intersects,
     Contains,
     BoundingBox,
+    DWithin,
 }
 
 /// Distance with unit
