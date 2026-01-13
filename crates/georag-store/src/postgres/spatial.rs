@@ -325,6 +325,11 @@ impl SpatialStore for PostgresStore {
                 ("ST_Contains(geometry, ST_GeomFromGeoJSON($1))", true, false)
             }
             SpatialPredicate::BoundingBox => ("geometry && ST_GeomFromGeoJSON($1)", true, false),
+            SpatialPredicate::DWithin => (
+                "ST_DWithin(geometry::geography, ST_GeomFromGeoJSON($1)::geography, $2)",
+                true,
+                true,
+            ),
         };
 
         // Check if we have the required parameters

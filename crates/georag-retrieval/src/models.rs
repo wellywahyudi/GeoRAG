@@ -1,14 +1,108 @@
 use georag_core::models::{ChunkId, FeatureId, SpatialFilter};
 use serde::{Deserialize, Serialize};
 
-/// Query plan with spatial and semantic options
+/// Text filter for keyword-based filtering
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TextFilter {
+    /// Keywords that appear in the text
+    pub must_contain: Vec<String>,
+
+    /// Keywords that do not appear in the text
+    pub must_not_contain: Vec<String>,
+
+    /// Whether matching is case-sensitive (default: false)
+    #[serde(default)]
+    pub case_sensitive: bool,
+}
+
+impl TextFilter {
+    /// Create a new empty text filter
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a keyword that must be present
+    pub fn must(mut self, keyword: impl Into<String>) -> Self {
+        self.must_contain.push(keyword.into());
+        self
+    }
+
+    /// Add multiple keywords that must be present
+    pub fn must_all(mut self, keywords: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.must_contain.extend(keywords.into_iter().map(Into::into));
+        self
+    }
+
+    /// Add a keyword that does not appear in the text
+    pub fn must_not(mut self, keyword: impl Into<String>) -> Self {
+        self.must_not_contain.push(keyword.into());
+        self
+    }
+
+    /// Add multiple keywords that do not appear in the text
+    pub fn must_not_any(mut self, keywords: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.must_not_contain.extend(keywords.into_iter().map(Into::into));
+        self
+    }
+
+    /// Set case sensitivity
+    pub fn with_case_sensitive(mut self, sensitive: bool) -> Self {
+        self.case_sensitive = sensitive;
+        self
+    }
+
+    /// Check if the filter is empty (no constraints)
+    pub fn is_empty(&self) -> bool {
+        self.must_contain.is_empty() && self.must_not_contain.is_empty()
+    }
+
+    /// Check if text matches this filter
+    pub fn matches(&self, text: &str) -> bool {
+        let text_normalized = if self.case_sensitive {
+            text.to_string()
+        } else {
+            text.to_lowercase()
+        };
+
+        // Check must_contain (all must be present)
+        for keyword in &self.must_contain {
+            let kw = if self.case_sensitive {
+                keyword.clone()
+            } else {
+                keyword.to_lowercase()
+            };
+            if !text_normalized.contains(&kw) {
+                return false;
+            }
+        }
+
+        // Check must_not_contain (none can be present)
+        for keyword in &self.must_not_contain {
+            let kw = if self.case_sensitive {
+                keyword.clone()
+            } else {
+                keyword.to_lowercase()
+            };
+            if text_normalized.contains(&kw) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+/// Query plan with spatial, text, and semantic options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryPlan {
-    /// The text query
+    /// The text query for semantic similarity
     pub text_query: String,
 
     /// Optional spatial filter
     pub spatial_filter: Option<SpatialFilter>,
+
+    /// Optional text filter for keyword matching
+    pub text_filter: Option<TextFilter>,
 
     /// Whether to enable semantic reranking
     pub semantic_rerank: bool,
@@ -26,6 +120,7 @@ impl QueryPlan {
         Self {
             text_query: text_query.into(),
             spatial_filter: None,
+            text_filter: None,
             semantic_rerank: true,
             top_k: 10,
             explain: false,
@@ -35,6 +130,12 @@ impl QueryPlan {
     /// Set the spatial filter
     pub fn with_spatial_filter(mut self, filter: SpatialFilter) -> Self {
         self.spatial_filter = Some(filter);
+        self
+    }
+
+    /// Set the text filter
+    pub fn with_text_filter(mut self, filter: TextFilter) -> Self {
+        self.text_filter = Some(filter);
         self
     }
 

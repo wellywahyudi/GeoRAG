@@ -2,9 +2,8 @@ use crate::models::{Geometry, SpatialFilter, SpatialPredicate};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::centroid::Centroid;
 use geo::algorithm::contains::Contains;
-use geo::algorithm::haversine_distance::HaversineDistance;
 use geo::algorithm::intersects::Intersects;
-use geo::{Geometry as GeoGeometry, Point, Rect};
+use geo::{Distance, Geometry as GeoGeometry, Haversine, Point, Rect};
 
 /// Evaluate if a geometry satisfies a spatial filter
 pub fn evaluate_spatial_filter(geometry: &Geometry, filter: &SpatialFilter) -> bool {
@@ -90,12 +89,12 @@ pub fn geodesic_distance(geom1: &Geometry, geom2: &Geometry) -> Option<f64> {
 
     match (&geo1, &geo2) {
         // Exact point-to-point distance using Haversine
-        (GeoGeometry::Point(p1), GeoGeometry::Point(p2)) => Some(p1.haversine_distance(p2)),
+        (GeoGeometry::Point(p1), GeoGeometry::Point(p2)) => Some(Haversine.distance(*p1, *p2)),
         // For other geometries, compute centroids and measure distance between them
         _ => {
             let c1: Point = geo1.centroid()?;
             let c2: Point = geo2.centroid()?;
-            Some(c1.haversine_distance(&c2))
+            Some(Haversine.distance(c1, c2))
         }
     }
 }

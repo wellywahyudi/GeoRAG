@@ -146,7 +146,7 @@ pub struct QueryArgs {
     /// The query text
     pub query: String,
 
-    /// Spatial filter predicate (within, intersects, contains, bbox)
+    /// Spatial filter predicate (within, intersects, contains, bbox, dwithin)
     #[arg(long)]
     pub spatial: Option<String>,
 
@@ -157,6 +157,14 @@ pub struct QueryArgs {
     /// Distance for proximity queries (e.g., "5km", "100m")
     #[arg(long)]
     pub distance: Option<String>,
+
+    /// Keywords that must appear in results (comma-separated)
+    #[arg(long, value_delimiter = ',')]
+    pub must_contain: Option<Vec<String>>,
+
+    /// Keywords to exclude from results (comma-separated)
+    #[arg(long, value_delimiter = ',')]
+    pub exclude: Option<Vec<String>>,
 
     /// Disable semantic reranking
     #[arg(long)]

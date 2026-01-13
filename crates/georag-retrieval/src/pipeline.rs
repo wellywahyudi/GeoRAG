@@ -45,17 +45,20 @@ where
         // Phase 1: Spatial filtering
         let (spatial_candidates, spatial_explanation) = self.spatial_filter_phase(plan).await?;
 
+        // Phase 1.5: Text filtering (keyword must/must-not)
+        let text_filtered_candidates = self.text_filter_phase(plan, &spatial_candidates).await?;
+
         // Phase 2: Semantic reranking (if enabled)
         let (ranked_results, semantic_explanation) = if plan.semantic_rerank {
-            self.semantic_rerank_phase(plan, &spatial_candidates).await?
+            self.semantic_rerank_phase(plan, &text_filtered_candidates).await?
         } else {
-            // No semantic reranking, just use spatial candidates
-            let results: Vec<ScoredResult> = spatial_candidates
+            // No semantic reranking, just use filtered candidates
+            let results: Vec<ScoredResult> = text_filtered_candidates
                 .iter()
                 .enumerate()
                 .map(|(idx, chunk_id)| ScoredResult {
                     chunk_id: *chunk_id,
-                    score: 1.0 - (idx as f32 / spatial_candidates.len() as f32),
+                    score: 1.0 - (idx as f32 / text_filtered_candidates.len().max(1) as f32),
                     spatial_score: None,
                 })
                 .take(plan.top_k)
@@ -90,7 +93,7 @@ where
         Ok(QueryResult {
             answer,
             sources,
-            spatial_matches: spatial_candidates.len(),
+            spatial_matches: text_filtered_candidates.len(),
             semantic_scores,
             explanation,
         })
@@ -149,6 +152,34 @@ where
         };
 
         Ok((chunk_ids, explanation))
+    }
+
+    /// Phase 1.5: Text content filtering
+    async fn text_filter_phase(
+        &self,
+        plan: &QueryPlan,
+        candidates: &[ChunkId],
+    ) -> Result<Vec<ChunkId>> {
+        let text_filter = match &plan.text_filter {
+            Some(f) if !f.is_empty() => f,
+            _ => return Ok(candidates.to_vec()), // No filter, pass through
+        };
+
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Fetch chunk contents
+        let chunks = self.document_store.get_chunks(candidates).await?;
+
+        // Apply text filter
+        let filtered: Vec<ChunkId> = chunks
+            .into_iter()
+            .filter(|chunk| text_filter.matches(&chunk.content))
+            .map(|chunk| chunk.id)
+            .collect();
+
+        Ok(filtered)
     }
 
     /// Phase 2: Semantic reranking

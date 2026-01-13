@@ -40,6 +40,24 @@ pub async fn execute(
         None
     };
 
+    // Build text filter from CLI args
+    let text_filter = if args.must_contain.is_some() || args.exclude.is_some() {
+        use georag_retrieval::models::TextFilter;
+        let mut filter = TextFilter::new();
+
+        if let Some(keywords) = &args.must_contain {
+            filter = filter.must_all(keywords.iter().cloned());
+        }
+
+        if let Some(keywords) = &args.exclude {
+            filter = filter.must_not_any(keywords.iter().cloned());
+        }
+
+        Some(filter)
+    } else {
+        None
+    };
+
     // Create query plan
     let query_plan = QueryPlan::new(&args.query)
         .with_semantic_rerank(!args.no_rerank)
@@ -48,6 +66,12 @@ pub async fn execute(
 
     let query_plan = if let Some(filter) = spatial_filter.clone() {
         query_plan.with_spatial_filter(filter)
+    } else {
+        query_plan
+    };
+
+    let query_plan = if let Some(filter) = text_filter.clone() {
+        query_plan.with_text_filter(filter)
     } else {
         query_plan
     };
@@ -64,6 +88,15 @@ pub async fn execute(
         }
     } else {
         output.kv("Spatial Filter", "None");
+    }
+
+    if let Some(ref filter) = text_filter {
+        if !filter.must_contain.is_empty() {
+            output.kv("Must Contain", filter.must_contain.join(", "));
+        }
+        if !filter.must_not_contain.is_empty() {
+            output.kv("Exclude", filter.must_not_contain.join(", "));
+        }
     }
 
     output.kv(

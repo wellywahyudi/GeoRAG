@@ -102,6 +102,7 @@ impl SpatialStore for MemorySpatialStore {
                 SpatialPredicate::Intersects => georag_geo::models::SpatialPredicate::Intersects,
                 SpatialPredicate::Contains => georag_geo::models::SpatialPredicate::Contains,
                 SpatialPredicate::BoundingBox => georag_geo::models::SpatialPredicate::BoundingBox,
+                SpatialPredicate::DWithin => georag_geo::models::SpatialPredicate::DWithin,
             },
             geometry: filter.geometry.as_ref().and({
                 // Convert serde_json::Value to georag_geo::models::Geometry
