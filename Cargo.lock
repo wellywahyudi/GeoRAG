@@ -1172,6 +1172,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
+ "futures",
  "geojson",
  "georag-core",
  "georag-geo",

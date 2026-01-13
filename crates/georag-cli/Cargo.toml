@@ -28,6 +28,7 @@ tracing-subscriber.workspace = true
 toml.workspace = true
 geojson.workspace = true
 chrono.workspace = true
+futures.workspace = true
 
 # Interactive prompts
 dialoguer = "0.11"

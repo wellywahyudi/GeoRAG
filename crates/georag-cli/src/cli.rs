@@ -128,6 +128,14 @@ pub struct AddArgs {
     /// Process files in parallel (for batch operations)
     #[arg(long, default_value = "true")]
     pub parallel: bool,
+
+    /// Maximum concurrent file processing jobs (0 = auto-detect CPU count)
+    #[arg(long, short = 'j', default_value = "0")]
+    pub jobs: usize,
+
+    /// Continue processing remaining files if one fails
+    #[arg(long)]
+    pub continue_on_error: bool,
 }
 
 #[derive(Parser, Debug)]

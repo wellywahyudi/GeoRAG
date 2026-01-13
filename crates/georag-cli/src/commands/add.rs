@@ -1,4 +1,6 @@
-use crate::batch::{display_file_progress, scan_directory, BatchSummary, FileProcessingResult};
+use crate::batch::{
+    display_file_progress, scan_directory, BatchSummary, DiscoveredFile, FileProcessingResult,
+};
 use crate::cli::AddArgs;
 use crate::dry_run::{display_planned_actions, ActionType, PlannedAction};
 use crate::output::OutputWriter;
@@ -6,6 +8,7 @@ use crate::output_types::{AddOutput, CrsMismatchInfo};
 use crate::storage::Storage;
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
+use futures::stream::{self, StreamExt};
 use georag_core::formats::{
     docx::DocxReader, geojson::GeoJsonReader, gpx::GpxReader, kml::KmlReader, pdf::PdfReader,
     shapefile::ShapefileFormatReader, FormatFeature, FormatRegistry,
@@ -14,6 +17,8 @@ use georag_core::models::dataset::GeometryType;
 use georag_core::models::{Dataset, DatasetId};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 pub async fn execute(
     args: AddArgs,
@@ -80,91 +85,123 @@ async fn execute_batch(
         return Ok(());
     }
 
-    let mut summary = BatchSummary::new();
-    summary.total_files = discovered_files.len();
+    let total_files = discovered_files.len();
+    let continue_on_error = args.continue_on_error;
 
-    // Process files sequentially or in parallel based on args
-    if args.parallel {
-        for (idx, file) in discovered_files.iter().enumerate() {
-            display_file_progress(output, idx + 1, discovered_files.len(), file);
+    // Process files based on parallel flag
+    let results = if args.parallel {
+        // Determine concurrency level
+        let concurrency = if args.jobs == 0 {
+            std::thread::available_parallelism().map(|p| p.get()).unwrap_or(4)
+        } else {
+            args.jobs
+        };
 
-            // Create args for single file processing
-            let file_args = AddArgs {
-                path: file.path.clone(),
-                name: None, // Use default name from filename
-                force: args.force,
-                interactive: false, // Disable interactive mode in batch
-                track_type: args.track_type.clone(),
-                folder: args.folder.clone(),
-                geometry: args.geometry.clone(),
-                parallel: false,
-            };
+        output.info(format!("Processing with {} parallel jobs", concurrency));
 
-            // Process the file
-            match execute_single(file_args, output, false, storage, registry).await {
-                Ok(_) => {
-                    summary.add_success(FileProcessingResult {
-                        path: file.path.clone(),
-                        format_name: file.format_name.clone(),
-                        error: None,
-                        dataset_name: Some(
-                            file.path
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("unknown")
-                                .to_string(),
-                        ),
-                    });
+        let semaphore = Arc::new(Semaphore::new(concurrency));
+
+        // Clone shared state for parallel processing
+        let args_force = args.force;
+        let args_track_type = args.track_type.clone();
+        let args_folder = args.folder.clone();
+        let args_geometry = args.geometry.clone();
+
+        // Process files in parallel using buffer_unordered
+        let results: Vec<FileProcessingResult> = stream::iter(discovered_files)
+            .map(|file| {
+                let sem = semaphore.clone();
+                let track_type = args_track_type.clone();
+                let folder = args_folder.clone();
+                let geometry = args_geometry.clone();
+
+                async move {
+                    let _permit = sem.acquire().await.expect("Semaphore closed");
+
+                    // Process the file
+                    let result = process_single_file(
+                        &file, args_force, track_type, folder, geometry, storage, registry,
+                    )
+                    .await;
+
+                    match result {
+                        Ok(dataset_name) => FileProcessingResult {
+                            path: file.path.clone(),
+                            format_name: file.format_name.clone(),
+                            error: None,
+                            dataset_name: Some(dataset_name),
+                        },
+                        Err(e) => FileProcessingResult {
+                            path: file.path.clone(),
+                            format_name: file.format_name.clone(),
+                            error: Some(e.to_string()),
+                            dataset_name: None,
+                        },
+                    }
                 }
-                Err(e) => {
-                    summary.add_failure(FileProcessingResult {
-                        path: file.path.clone(),
-                        format_name: file.format_name.clone(),
-                        error: Some(e.to_string()),
-                        dataset_name: None,
-                    });
-                }
-            }
-        }
+            })
+            .buffer_unordered(concurrency)
+            .collect()
+            .await;
+
+        results
     } else {
+        // Sequential processing
+        let mut results = Vec::with_capacity(discovered_files.len());
+
         for (idx, file) in discovered_files.iter().enumerate() {
             display_file_progress(output, idx + 1, discovered_files.len(), file);
 
-            let file_args = AddArgs {
-                path: file.path.clone(),
-                name: None,
-                force: args.force,
-                interactive: false,
-                track_type: args.track_type.clone(),
-                folder: args.folder.clone(),
-                geometry: args.geometry.clone(),
-                parallel: false,
-            };
+            let result = process_single_file(
+                file,
+                args.force,
+                args.track_type.clone(),
+                args.folder.clone(),
+                args.geometry.clone(),
+                storage,
+                registry,
+            )
+            .await;
 
-            match execute_single(file_args, output, false, storage, registry).await {
-                Ok(_) => {
-                    summary.add_success(FileProcessingResult {
-                        path: file.path.clone(),
-                        format_name: file.format_name.clone(),
-                        error: None,
-                        dataset_name: Some(
-                            file.path
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("unknown")
-                                .to_string(),
-                        ),
-                    });
-                }
+            let file_result = match result {
+                Ok(dataset_name) => FileProcessingResult {
+                    path: file.path.clone(),
+                    format_name: file.format_name.clone(),
+                    error: None,
+                    dataset_name: Some(dataset_name),
+                },
                 Err(e) => {
-                    summary.add_failure(FileProcessingResult {
+                    let result = FileProcessingResult {
                         path: file.path.clone(),
                         format_name: file.format_name.clone(),
                         error: Some(e.to_string()),
                         dataset_name: None,
-                    });
+                    };
+
+                    if !continue_on_error {
+                        results.push(result);
+                        break;
+                    }
+
+                    result
                 }
-            }
+            };
+
+            results.push(file_result);
+        }
+
+        results
+    };
+
+    // Build summary from results
+    let mut summary = BatchSummary::new();
+    summary.total_files = total_files;
+
+    for result in results {
+        if result.error.is_some() {
+            summary.add_failure(result);
+        } else {
+            summary.add_success(result);
         }
     }
 
@@ -172,11 +209,42 @@ async fn execute_batch(
     summary.display(output);
 
     // Return error if any files failed (but still show summary)
-    if !summary.all_succeeded() {
+    if !summary.all_succeeded() && !continue_on_error {
         bail!("{} of {} files failed to process", summary.failure_count(), summary.total_files);
     }
 
     Ok(())
+}
+
+/// Process a single file (extracted for parallel use)
+async fn process_single_file(
+    file: &DiscoveredFile,
+    force: bool,
+    track_type: Option<String>,
+    folder: Option<String>,
+    geometry: Option<String>,
+    storage: &Storage,
+    registry: &FormatRegistry,
+) -> Result<String> {
+    let file_args = AddArgs {
+        path: file.path.clone(),
+        name: None,
+        force,
+        interactive: false,
+        track_type,
+        folder,
+        geometry,
+        parallel: false,
+        jobs: 0,
+        continue_on_error: false,
+    };
+
+    // We need a silent output writer for parallel processing (json=false for no output)
+    let silent_output = OutputWriter::new(false);
+
+    execute_single(file_args, &silent_output, false, storage, registry).await?;
+
+    Ok(file.path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string())
 }
 
 /// Execute single file processing
