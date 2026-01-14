@@ -82,7 +82,7 @@ pub async fn execute(
 
     if let Some(ref filter) = spatial_filter {
         output.kv("Spatial Predicate", format!("{:?}", filter.predicate));
-        output.kv("CRS", format!("EPSG:{}", filter.crs));
+        output.kv("CRS", format!("EPSG:{}", filter.crs.epsg));
         if let Some(ref dist) = filter.distance {
             output.kv("Distance", format!("{} {:?}", dist.value, dist.unit));
         }
@@ -281,15 +281,14 @@ fn load_index_state(georag_dir: &Path) -> Result<IndexState> {
     Ok(state)
 }
 
-/// Parse spatial filter from command line arguments
 fn parse_spatial_filter(
     predicate_str: &str,
     _geometry_str: Option<&str>,
     distance_str: Option<&str>,
     config: &WorkspaceConfig,
 ) -> Result<georag_core::models::SpatialFilter> {
-    use georag_core::models::query::{
-        Distance as CoreDistance, DistanceUnit as CoreDistanceUnit, SpatialPredicate,
+    use georag_core::models::{
+        Crs, Distance as CoreDistance, DistanceUnit as CoreDistanceUnit, SpatialPredicate,
     };
 
     // Parse predicate
@@ -325,7 +324,7 @@ fn parse_spatial_filter(
         predicate,
         geometry: None,
         distance,
-        crs: config.crs,
+        crs: Crs::new(config.crs, ""),
     })
 }
 

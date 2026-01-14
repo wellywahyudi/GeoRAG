@@ -181,6 +181,7 @@ fn test_feature_with_null_geometry() {
 #[test]
 fn test_feature_geometry_association() {
     use georag_core::models::query::{Feature, FeatureId};
+    use georag_core::models::Geometry;
     use std::collections::HashMap;
 
     // Create a feature without geometry
@@ -192,11 +193,8 @@ fn test_feature_geometry_association() {
 
     assert!(!feature.has_geometry());
 
-    // Associate geometry
-    let geometry = serde_json::json!({
-        "type": "Point",
-        "coordinates": [-122.4, 47.6]
-    });
+    // Associate geometry using typed Geometry
+    let geometry = Geometry::point(-122.4, 47.6);
     feature.associate_geometry(geometry);
 
     assert!(feature.has_geometry());
@@ -204,5 +202,5 @@ fn test_feature_geometry_association() {
 
     // Verify geometry is correct
     let geom = feature.geometry.as_ref().unwrap();
-    assert_eq!(geom["type"], "Point");
+    assert!(matches!(geom, Geometry::Point { .. }));
 }

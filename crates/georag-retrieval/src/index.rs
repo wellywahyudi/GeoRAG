@@ -1,6 +1,6 @@
 use chrono::Utc;
 use georag_core::error::Result;
-use georag_core::models::{Embedding, IndexState, SpatialMetadata, TextChunk};
+use georag_core::models::{Embedding, IndexState, SpatialFilter, SpatialMetadata, SpatialPredicate, TextChunk};
 use georag_geo::models::{Crs, ValidityMode};
 use georag_geo::validation::validate_geometry;
 use georag_llm::ports::Embedder;
@@ -83,11 +83,11 @@ where
     async fn normalize_geometries(&self) -> Result<usize> {
         let features = self
             .spatial_store
-            .spatial_query(&georag_core::models::SpatialFilter {
-                predicate: georag_core::models::query::SpatialPredicate::BoundingBox,
+            .spatial_query(&SpatialFilter {
+                predicate: SpatialPredicate::BoundingBox,
                 geometry: None,
                 distance: None,
-                crs: self.workspace_crs.epsg,
+                crs: self.workspace_crs.clone(),
             })
             .await?;
 
@@ -107,29 +107,25 @@ where
     async fn fix_invalid_geometries(&self) -> Result<usize> {
         let features = self
             .spatial_store
-            .spatial_query(&georag_core::models::SpatialFilter {
-                predicate: georag_core::models::query::SpatialPredicate::BoundingBox,
+            .spatial_query(&SpatialFilter {
+                predicate: SpatialPredicate::BoundingBox,
                 geometry: None,
                 distance: None,
-                crs: self.workspace_crs.epsg,
+                crs: self.workspace_crs.clone(),
             })
             .await?;
 
         let mut fixed_count = 0;
 
         for feature in features {
-            // Parse geometry from JSON (skip features without geometry)
-            if let Some(geometry_value) = &feature.geometry {
-                if let Ok(geom) =
-                    serde_json::from_value::<georag_geo::models::Geometry>(geometry_value.clone())
-                {
-                    // Validate geometry
-                    let validation_result = validate_geometry(&geom, ValidityMode::Lenient);
-                    if !validation_result.is_valid {
-                        // In a full implementation, we would attempt to fix the geometry
-                        // For now, we just count invalid geometries
-                        fixed_count += 1;
-                    }
+            // Features now have typed geometry
+            if let Some(ref geom) = feature.geometry {
+                // Validate geometry
+                let validation_result = validate_geometry(geom, ValidityMode::Lenient);
+                if !validation_result.is_valid {
+                    // In a full implementation, we would attempt to fix the geometry
+                    // For now, we just count invalid geometries
+                    fixed_count += 1;
                 }
             }
         }

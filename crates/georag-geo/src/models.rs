@@ -1,231 +1,207 @@
+//! Geometry models for georag-geo.
+//!
+//! This module re-exports canonical types from `georag-core` and provides
+//! additional geo-specific functionality like conversions to/from the `geo` crate.
+
 use geo::Geometry as GeoGeometry;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
-/// Coordinate Reference System identified by EPSG code
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Crs {
-    pub epsg: u32,
-    pub name: String,
-}
+// Re-export canonical types from georag-core
+pub use georag_core::models::{
+    Crs, Distance, DistanceUnit, Geometry, GeometryType, SpatialFilter, SpatialPredicate,
+    ValidityMode,
+};
 
-impl Crs {
-    pub fn new(epsg: u32, name: impl Into<String>) -> Self {
-        Self { epsg, name: name.into() }
-    }
-
-    /// WGS 84 (EPSG:4326)
-    pub fn wgs84() -> Self {
-        Self::new(4326, "WGS 84")
-    }
-
-    /// Web Mercator (EPSG:3857)
-    pub fn web_mercator() -> Self {
-        Self::new(3857, "Web Mercator")
-    }
-}
-
-/// Distance units for spatial operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DistanceUnit {
-    Meters,
-    Kilometers,
-    Miles,
-    Feet,
-}
-
-impl DistanceUnit {
-    /// Convert a distance value to meters
-    pub fn to_meters(&self, value: f64) -> f64 {
-        match self {
-            DistanceUnit::Meters => value,
-            DistanceUnit::Kilometers => value * 1000.0,
-            DistanceUnit::Miles => value * 1609.34,
-            DistanceUnit::Feet => value * 0.3048,
+/// Convert a canonical Geometry to a geo::Geometry
+pub fn to_geo_geometry(geom: &Geometry) -> GeoGeometry {
+    match geom {
+        Geometry::Point { coordinates } => {
+            GeoGeometry::Point(geo::Point::new(coordinates[0], coordinates[1]))
         }
-    }
-
-    /// Convert a distance value from meters to this unit
-    pub fn from_meters(&self, meters: f64) -> f64 {
-        match self {
-            DistanceUnit::Meters => meters,
-            DistanceUnit::Kilometers => meters / 1000.0,
-            DistanceUnit::Miles => meters / 1609.34,
-            DistanceUnit::Feet => meters / 0.3048,
+        Geometry::LineString { coordinates } => {
+            let coords: Vec<geo::Coord> =
+                coordinates.iter().map(|c| geo::Coord { x: c[0], y: c[1] }).collect();
+            GeoGeometry::LineString(geo::LineString::new(coords))
         }
-    }
-}
-
-/// Geometry validation mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ValidityMode {
-    /// Strict validation - reject any invalid geometries
-    Strict,
-    /// Lenient validation - attempt to fix invalid geometries
-    Lenient,
-}
-
-/// A spatial feature with geometry, properties, and CRS
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Feature {
-    pub id: FeatureId,
-    pub geometry: Geometry,
-    pub properties: HashMap<String, serde_json::Value>,
-    pub crs: Crs,
-}
-
-/// Feature identifier
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct FeatureId(pub String);
-
-impl From<String> for FeatureId {
-    fn from(s: String) -> Self {
-        FeatureId(s)
-    }
-}
-
-impl From<&str> for FeatureId {
-    fn from(s: &str) -> Self {
-        FeatureId(s.to_string())
-    }
-}
-
-/// Geometry wrapper around geo crate types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum Geometry {
-    Point(geo::Point),
-    LineString(geo::LineString),
-    Polygon(geo::Polygon),
-    MultiPoint(geo::MultiPoint),
-    MultiLineString(geo::MultiLineString),
-    MultiPolygon(geo::MultiPolygon),
-}
-
-impl From<GeoGeometry> for Geometry {
-    fn from(geom: GeoGeometry) -> Self {
-        match geom {
-            GeoGeometry::Point(p) => Geometry::Point(p),
-            GeoGeometry::Line(l) => Geometry::LineString(vec![l.start, l.end].into()),
-            GeoGeometry::LineString(ls) => Geometry::LineString(ls),
-            GeoGeometry::Polygon(p) => Geometry::Polygon(p),
-            GeoGeometry::MultiPoint(mp) => Geometry::MultiPoint(mp),
-            GeoGeometry::MultiLineString(mls) => Geometry::MultiLineString(mls),
-            GeoGeometry::MultiPolygon(mp) => Geometry::MultiPolygon(mp),
-            GeoGeometry::GeometryCollection(gc) => {
-                // For simplicity, take the first geometry or default to a point
-                gc.into_iter()
-                    .next()
-                    .map(Geometry::from)
-                    .unwrap_or_else(|| Geometry::Point(geo::Point::new(0.0, 0.0)))
+        Geometry::Polygon { coordinates } => {
+            let rings: Vec<geo::LineString> = coordinates
+                .iter()
+                .map(|ring| {
+                    let coords: Vec<geo::Coord> =
+                        ring.iter().map(|c| geo::Coord { x: c[0], y: c[1] }).collect();
+                    geo::LineString::new(coords)
+                })
+                .collect();
+            if rings.is_empty() {
+                GeoGeometry::Polygon(geo::Polygon::new(geo::LineString::new(vec![]), vec![]))
+            } else {
+                let exterior = rings[0].clone();
+                let interiors: Vec<geo::LineString> = rings.into_iter().skip(1).collect();
+                GeoGeometry::Polygon(geo::Polygon::new(exterior, interiors))
             }
-            GeoGeometry::Rect(r) => Geometry::Polygon(r.to_polygon()),
-            GeoGeometry::Triangle(t) => Geometry::Polygon(t.to_polygon()),
+        }
+        Geometry::MultiPoint { coordinates } => {
+            let points: Vec<geo::Point> =
+                coordinates.iter().map(|c| geo::Point::new(c[0], c[1])).collect();
+            GeoGeometry::MultiPoint(geo::MultiPoint::new(points))
+        }
+        Geometry::MultiLineString { coordinates } => {
+            let lines: Vec<geo::LineString> = coordinates
+                .iter()
+                .map(|line| {
+                    let coords: Vec<geo::Coord> =
+                        line.iter().map(|c| geo::Coord { x: c[0], y: c[1] }).collect();
+                    geo::LineString::new(coords)
+                })
+                .collect();
+            GeoGeometry::MultiLineString(geo::MultiLineString::new(lines))
+        }
+        Geometry::MultiPolygon { coordinates } => {
+            let polygons: Vec<geo::Polygon> = coordinates
+                .iter()
+                .map(|poly| {
+                    let rings: Vec<geo::LineString> = poly
+                        .iter()
+                        .map(|ring| {
+                            let coords: Vec<geo::Coord> =
+                                ring.iter().map(|c| geo::Coord { x: c[0], y: c[1] }).collect();
+                            geo::LineString::new(coords)
+                        })
+                        .collect();
+                    if rings.is_empty() {
+                        geo::Polygon::new(geo::LineString::new(vec![]), vec![])
+                    } else {
+                        let exterior = rings[0].clone();
+                        let interiors: Vec<geo::LineString> = rings.into_iter().skip(1).collect();
+                        geo::Polygon::new(exterior, interiors)
+                    }
+                })
+                .collect();
+            GeoGeometry::MultiPolygon(geo::MultiPolygon::new(polygons))
         }
     }
 }
 
-impl From<Geometry> for GeoGeometry {
-    fn from(geom: Geometry) -> Self {
-        match geom {
-            Geometry::Point(p) => GeoGeometry::Point(p),
-            Geometry::LineString(ls) => GeoGeometry::LineString(ls),
-            Geometry::Polygon(p) => GeoGeometry::Polygon(p),
-            Geometry::MultiPoint(mp) => GeoGeometry::MultiPoint(mp),
-            Geometry::MultiLineString(mls) => GeoGeometry::MultiLineString(mls),
-            Geometry::MultiPolygon(mp) => GeoGeometry::MultiPolygon(mp),
+/// Convert a geo::Geometry to a canonical Geometry
+pub fn from_geo_geometry(geom: &GeoGeometry) -> Geometry {
+    match geom {
+        GeoGeometry::Point(p) => Geometry::Point { coordinates: [p.x(), p.y()] },
+        GeoGeometry::Line(l) => Geometry::LineString {
+            coordinates: vec![[l.start.x, l.start.y], [l.end.x, l.end.y]],
+        },
+        GeoGeometry::LineString(ls) => Geometry::LineString {
+            coordinates: ls.coords().map(|c| [c.x, c.y]).collect(),
+        },
+        GeoGeometry::Polygon(p) => {
+            let mut rings = Vec::new();
+            let exterior: Vec<[f64; 2]> = p.exterior().coords().map(|c| [c.x, c.y]).collect();
+            rings.push(exterior);
+            for interior in p.interiors() {
+                let ring: Vec<[f64; 2]> = interior.coords().map(|c| [c.x, c.y]).collect();
+                rings.push(ring);
+            }
+            Geometry::Polygon { coordinates: rings }
+        }
+        GeoGeometry::MultiPoint(mp) => {
+            Geometry::MultiPoint { coordinates: mp.iter().map(|p| [p.x(), p.y()]).collect() }
+        }
+        GeoGeometry::MultiLineString(mls) => Geometry::MultiLineString {
+            coordinates: mls.iter().map(|ls| ls.coords().map(|c| [c.x, c.y]).collect()).collect(),
+        },
+        GeoGeometry::MultiPolygon(mp) => Geometry::MultiPolygon {
+            coordinates: mp
+                .iter()
+                .map(|p| {
+                    let mut rings = Vec::new();
+                    let exterior: Vec<[f64; 2]> =
+                        p.exterior().coords().map(|c| [c.x, c.y]).collect();
+                    rings.push(exterior);
+                    for interior in p.interiors() {
+                        let ring: Vec<[f64; 2]> = interior.coords().map(|c| [c.x, c.y]).collect();
+                        rings.push(ring);
+                    }
+                    rings
+                })
+                .collect(),
+        },
+        GeoGeometry::GeometryCollection(gc) => {
+            // Take the first geometry or return an empty point
+            gc.iter()
+                .next()
+                .map(from_geo_geometry)
+                .unwrap_or_else(|| Geometry::Point { coordinates: [0.0, 0.0] })
+        }
+        GeoGeometry::Rect(r) => from_geo_geometry(&GeoGeometry::Polygon(r.to_polygon())),
+        GeoGeometry::Triangle(t) => from_geo_geometry(&GeoGeometry::Polygon(t.to_polygon())),
+    }
+}
+
+/// Extension trait for Geometry with geo-crate operations
+pub trait GeometryExt {
+    /// Convert to geo::Geometry
+    fn to_geo(&self) -> GeoGeometry;
+
+    /// Get the centroid as coordinates
+    fn centroid_coords(&self) -> Option<[f64; 2]>;
+}
+
+impl GeometryExt for Geometry {
+    fn to_geo(&self) -> GeoGeometry {
+        to_geo_geometry(self)
+    }
+
+    fn centroid_coords(&self) -> Option<[f64; 2]> {
+        use geo::algorithm::centroid::Centroid;
+        let geo_geom = self.to_geo();
+        geo_geom.centroid().map(|p| [p.x(), p.y()])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_point_roundtrip() {
+        let geom = Geometry::point(115.0, -8.5);
+        let geo_geom = to_geo_geometry(&geom);
+        let back = from_geo_geometry(&geo_geom);
+
+        if let (Geometry::Point { coordinates: orig }, Geometry::Point { coordinates: converted }) =
+            (&geom, &back)
+        {
+            assert!((orig[0] - converted[0]).abs() < 1e-10);
+            assert!((orig[1] - converted[1]).abs() < 1e-10);
+        } else {
+            panic!("Expected Point geometry");
         }
     }
-}
 
-/// Geometry type classification
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GeometryType {
-    Point,
-    LineString,
-    Polygon,
-    MultiPoint,
-    MultiLineString,
-    MultiPolygon,
-    Mixed,
-}
+    #[test]
+    fn test_polygon_roundtrip() {
+        let geom = Geometry::polygon(vec![vec![
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 1.0],
+            [0.0, 0.0],
+        ]]);
+        let geo_geom = to_geo_geometry(&geom);
+        let back = from_geo_geometry(&geo_geom);
 
-impl Geometry {
-    /// Get the geometry type
-    pub fn geometry_type(&self) -> GeometryType {
-        match self {
-            Geometry::Point(_) => GeometryType::Point,
-            Geometry::LineString(_) => GeometryType::LineString,
-            Geometry::Polygon(_) => GeometryType::Polygon,
-            Geometry::MultiPoint(_) => GeometryType::MultiPoint,
-            Geometry::MultiLineString(_) => GeometryType::MultiLineString,
-            Geometry::MultiPolygon(_) => GeometryType::MultiPolygon,
-        }
-    }
-}
-
-/// Spatial predicate for filtering
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SpatialPredicate {
-    /// Geometry is completely within the filter geometry
-    Within,
-    /// Geometry intersects (overlaps) the filter geometry
-    Intersects,
-    /// Geometry contains the filter geometry
-    Contains,
-    /// Bounding boxes intersect (fast approximation)
-    BoundingBox,
-    /// Geometry is within specified distance of filter geometry (geodesic)
-    DWithin,
-}
-
-/// Distance with unit
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Distance {
-    pub value: f64,
-    pub unit: DistanceUnit,
-}
-
-impl Distance {
-    /// Create a new distance
-    pub fn new(value: f64, unit: DistanceUnit) -> Self {
-        Self { value, unit }
+        assert!(matches!(back, Geometry::Polygon { .. }));
     }
 
-    /// Convert to meters
-    pub fn to_meters(&self) -> f64 {
-        self.unit.to_meters(self.value)
-    }
-}
-
-/// Spatial filter for queries
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpatialFilter {
-    pub predicate: SpatialPredicate,
-    pub geometry: Option<Geometry>,
-    pub distance: Option<Distance>,
-    pub crs: Crs,
-}
-
-impl SpatialFilter {
-    /// Create a new spatial filter
-    pub fn new(predicate: SpatialPredicate, crs: Crs) -> Self {
-        Self {
-            predicate,
-            geometry: None,
-            distance: None,
-            crs,
-        }
-    }
-
-    /// Set the filter geometry
-    pub fn with_geometry(mut self, geometry: Geometry) -> Self {
-        self.geometry = Some(geometry);
-        self
-    }
-
-    /// Set the distance for proximity queries
-    pub fn with_distance(mut self, distance: Distance) -> Self {
-        self.distance = Some(distance);
-        self
+    #[test]
+    fn test_centroid() {
+        let geom = Geometry::polygon(vec![vec![
+            [0.0, 0.0],
+            [2.0, 0.0],
+            [2.0, 2.0],
+            [0.0, 2.0],
+            [0.0, 0.0],
+        ]]);
+        let centroid = geom.centroid_coords().unwrap();
+        assert!((centroid[0] - 1.0).abs() < 1e-10);
+        assert!((centroid[1] - 1.0).abs() < 1e-10);
     }
 }

@@ -1,8 +1,9 @@
 use async_trait::async_trait;
 use georag_core::error::{GeoragError, Result};
 use georag_core::models::dataset::GeometryType;
-use georag_core::models::query::SpatialPredicate;
-use georag_core::models::{Dataset, DatasetId, DatasetMeta, Feature, FeatureId, SpatialFilter};
+use georag_core::models::{
+    Dataset, DatasetId, DatasetMeta, Feature, FeatureId, Geometry, SpatialFilter, SpatialPredicate,
+};
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -375,8 +376,9 @@ impl SpatialStore for PostgresStore {
                 let id = FeatureId(uuid.as_u128() as u64);
 
                 let geometry_str: String = row.get("geometry");
-                let geometry: serde_json::Value =
+                let geometry_json: serde_json::Value =
                     serde_json::from_str(&geometry_str).unwrap_or(serde_json::json!({}));
+                let geometry = Geometry::from_geojson(&geometry_json);
 
                 let properties: serde_json::Value = row.get("properties");
                 let properties_map = properties
@@ -386,9 +388,9 @@ impl SpatialStore for PostgresStore {
 
                 Feature {
                     id,
-                    geometry: Some(geometry),
+                    geometry,
                     properties: properties_map,
-                    crs: filter.crs,
+                    crs: filter.crs.epsg,
                 }
             })
             .collect();
@@ -414,10 +416,11 @@ impl SpatialStore for PostgresStore {
         match row {
             Some(row) => {
                 let geometry_str: String = row.get("geometry");
-                let geometry: serde_json::Value =
+                let geometry_json: serde_json::Value =
                     serde_json::from_str(&geometry_str).map_err(|e| {
                         GeoragError::Serialization(format!("Failed to parse geometry: {}", e))
                     })?;
+                let geometry = Geometry::from_geojson(&geometry_json);
 
                 let properties: serde_json::Value = row.get("properties");
                 let properties_map = properties
@@ -427,7 +430,7 @@ impl SpatialStore for PostgresStore {
 
                 Ok(Some(Feature {
                     id,
-                    geometry: Some(geometry),
+                    geometry,
                     properties: properties_map,
                     crs: 4326, // Default CRS
                 }))
@@ -460,8 +463,9 @@ impl SpatialStore for PostgresStore {
                 let id = FeatureId(uuid.as_u128() as u64);
 
                 let geometry_str: String = row.get("geometry");
-                let geometry: serde_json::Value =
+                let geometry_json: serde_json::Value =
                     serde_json::from_str(&geometry_str).unwrap_or(serde_json::json!({}));
+                let geometry = Geometry::from_geojson(&geometry_json);
 
                 let properties: serde_json::Value = row.get("properties");
                 let properties_map = properties
@@ -471,7 +475,7 @@ impl SpatialStore for PostgresStore {
 
                 Feature {
                     id,
-                    geometry: Some(geometry),
+                    geometry,
                     properties: properties_map,
                     crs: 4326, // Default CRS
                 }

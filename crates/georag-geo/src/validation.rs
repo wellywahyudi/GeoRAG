@@ -1,3 +1,5 @@
+//! Geometry validation utilities
+
 use crate::models::{Geometry, ValidityMode};
 use georag_core::error::{GeoragError, Result};
 
@@ -33,24 +35,28 @@ impl ValidationResult {
     }
 }
 
+/// Check if a coordinate is valid (finite)
+fn is_valid_coord(coord: &[f64; 2]) -> bool {
+    coord[0].is_finite() && coord[1].is_finite()
+}
+
 /// Validate a geometry
 pub fn validate_geometry(geometry: &Geometry, _mode: ValidityMode) -> ValidationResult {
     match geometry {
-        Geometry::Point(p) => validate_point(p),
-        Geometry::LineString(ls) => validate_linestring(ls),
-        Geometry::Polygon(poly) => validate_polygon(poly),
-        Geometry::MultiPoint(mp) => validate_multipoint(mp),
-        Geometry::MultiLineString(mls) => validate_multilinestring(mls),
-        Geometry::MultiPolygon(mp) => validate_multipolygon(mp),
+        Geometry::Point { coordinates } => validate_point(coordinates),
+        Geometry::LineString { coordinates } => validate_linestring(coordinates),
+        Geometry::Polygon { coordinates } => validate_polygon(coordinates),
+        Geometry::MultiPoint { coordinates } => validate_multipoint(coordinates),
+        Geometry::MultiLineString { coordinates } => validate_multilinestring(coordinates),
+        Geometry::MultiPolygon { coordinates } => validate_multipolygon(coordinates),
     }
 }
 
-fn validate_point(point: &geo::Point) -> ValidationResult {
-    // Check for NaN or infinite coordinates
-    if !point.x().is_finite() || !point.y().is_finite() {
+fn validate_point(coords: &[f64; 2]) -> ValidationResult {
+    if !is_valid_coord(coords) {
         let mut result = ValidationResult::valid();
         result.add_error(
-            format!("Point({}, {})", point.x(), point.y()),
+            format!("Point({}, {})", coords[0], coords[1]),
             "Coordinates must be finite".to_string(),
         );
         return result;
@@ -58,66 +64,56 @@ fn validate_point(point: &geo::Point) -> ValidationResult {
     ValidationResult::valid()
 }
 
-fn validate_linestring(linestring: &geo::LineString) -> ValidationResult {
+fn validate_linestring(coords: &[[f64; 2]]) -> ValidationResult {
     let mut result = ValidationResult::valid();
 
-    // LineString must have at least 2 points
-    if linestring.0.len() < 2 {
+    if coords.len() < 2 {
         result.add_error(
             "LineString".to_string(),
-            format!("LineString must have at least 2 points, found {}", linestring.0.len()),
+            format!("LineString must have at least 2 points, found {}", coords.len()),
         );
         return result;
     }
 
-    // Check each point
-    for (i, coord) in linestring.0.iter().enumerate() {
-        if !coord.x.is_finite() || !coord.y.is_finite() {
-            result
-                .add_error(format!("LineString[{}]", i), "Coordinates must be finite".to_string());
+    for (i, coord) in coords.iter().enumerate() {
+        if !is_valid_coord(coord) {
+            result.add_error(format!("LineString[{}]", i), "Coordinates must be finite".to_string());
         }
     }
 
     result
 }
 
-fn validate_polygon(polygon: &geo::Polygon) -> ValidationResult {
+fn validate_polygon(rings: &[Vec<[f64; 2]>]) -> ValidationResult {
     let mut result = ValidationResult::valid();
 
-    // Check exterior ring
-    let exterior = polygon.exterior();
-    if exterior.0.len() < 4 {
+    if rings.is_empty() {
+        result.add_error("Polygon".to_string(), "Polygon must have at least one ring".to_string());
+        return result;
+    }
+
+    let exterior = &rings[0];
+    if exterior.len() < 4 {
         result.add_error(
             "Polygon exterior".to_string(),
-            format!("Polygon exterior must have at least 4 points, found {}", exterior.0.len()),
+            format!("Polygon exterior must have at least 4 points, found {}", exterior.len()),
         );
     }
 
-    // Check if closed
-    if let (Some(first), Some(last)) = (exterior.0.first(), exterior.0.last()) {
+    // Check if exterior is closed
+    if let (Some(first), Some(last)) = (exterior.first(), exterior.last()) {
         if first != last {
-            result.add_error(
-                "Polygon exterior".to_string(),
-                "Polygon exterior must be closed (first point == last point)".to_string(),
-            );
+            result.add_error("Polygon exterior".to_string(), "Polygon exterior ring is not closed".to_string());
         }
     }
 
-    // Check interior rings
-    for (i, interior) in polygon.interiors().iter().enumerate() {
-        if interior.0.len() < 4 {
-            result.add_error(
-                format!("Polygon interior[{}]", i),
-                format!("Polygon interior must have at least 4 points, found {}", interior.0.len()),
-            );
-        }
-
-        // Check if closed
-        if let (Some(first), Some(last)) = (interior.0.first(), interior.0.last()) {
-            if first != last {
+    // Check coordinate validity
+    for (ring_idx, ring) in rings.iter().enumerate() {
+        for (coord_idx, coord) in ring.iter().enumerate() {
+            if !is_valid_coord(coord) {
                 result.add_error(
-                    format!("Polygon interior[{}]", i),
-                    "Polygon interior must be closed (first point == last point)".to_string(),
+                    format!("Polygon ring[{}][{}]", ring_idx, coord_idx),
+                    "Coordinates must be finite".to_string(),
                 );
             }
         }
@@ -126,42 +122,35 @@ fn validate_polygon(polygon: &geo::Polygon) -> ValidationResult {
     result
 }
 
-fn validate_multipoint(multipoint: &geo::MultiPoint) -> ValidationResult {
+fn validate_multipoint(coords: &[[f64; 2]]) -> ValidationResult {
     let mut result = ValidationResult::valid();
-    for (i, point) in multipoint.0.iter().enumerate() {
-        if !point.x().is_finite() || !point.y().is_finite() {
-            result
-                .add_error(format!("MultiPoint[{}]", i), "Coordinates must be finite".to_string());
+
+    for (i, coord) in coords.iter().enumerate() {
+        if !is_valid_coord(coord) {
+            result.add_error(format!("MultiPoint[{}]", i), "Coordinates must be finite".to_string());
         }
     }
 
     result
 }
 
-fn validate_multilinestring(multilinestring: &geo::MultiLineString) -> ValidationResult {
+fn validate_multilinestring(lines: &[Vec<[f64; 2]>]) -> ValidationResult {
     let mut result = ValidationResult::valid();
 
-    for (i, linestring) in multilinestring.0.iter().enumerate() {
-        let ls_result = validate_linestring(linestring);
-        if !ls_result.is_valid {
-            for error in ls_result.errors {
-                result
-                    .add_error(format!("MultiLineString[{}].{}", i, error.location), error.reason);
-            }
+    for (line_idx, line) in lines.iter().enumerate() {
+        if line.len() < 2 {
+            result.add_error(
+                format!("MultiLineString[{}]", line_idx),
+                format!("LineString must have at least 2 points, found {}", line.len()),
+            );
         }
-    }
 
-    result
-}
-
-fn validate_multipolygon(multipolygon: &geo::MultiPolygon) -> ValidationResult {
-    let mut result = ValidationResult::valid();
-
-    for (i, polygon) in multipolygon.0.iter().enumerate() {
-        let poly_result = validate_polygon(polygon);
-        if !poly_result.is_valid {
-            for error in poly_result.errors {
-                result.add_error(format!("MultiPolygon[{}].{}", i, error.location), error.reason);
+        for (coord_idx, coord) in line.iter().enumerate() {
+            if !is_valid_coord(coord) {
+                result.add_error(
+                    format!("MultiLineString[{}][{}]", line_idx, coord_idx),
+                    "Coordinates must be finite".to_string(),
+                );
             }
         }
     }
@@ -169,43 +158,117 @@ fn validate_multipolygon(multipolygon: &geo::MultiPolygon) -> ValidationResult {
     result
 }
 
-/// Attempt to fix invalid geometries
-pub fn fix_geometry(geometry: &Geometry) -> Result<Geometry> {
-    match geometry {
-        Geometry::Polygon(poly) => {
-            let validation = validate_polygon(poly);
-            if validation.is_valid {
-                Ok(geometry.clone())
-            } else {
-                Err(GeoragError::InvalidGeometry {
-                    feature_id: "unknown".to_string(),
-                    reason: validation
-                        .errors
-                        .first()
-                        .map(|e| e.reason.clone())
-                        .unwrap_or_else(|| "Invalid geometry".to_string()),
-                })
-            }
+fn validate_multipolygon(polygons: &[Vec<Vec<[f64; 2]>>]) -> ValidationResult {
+    let mut result = ValidationResult::valid();
+
+    for (poly_idx, poly) in polygons.iter().enumerate() {
+        if poly.is_empty() {
+            result.add_error(
+                format!("MultiPolygon[{}]", poly_idx),
+                "Polygon must have at least one ring".to_string(),
+            );
+            continue;
         }
-        _ => {
-            let validation = validate_geometry(geometry, ValidityMode::Strict);
-            if validation.is_valid {
-                Ok(geometry.clone())
-            } else {
-                Err(GeoragError::InvalidGeometry {
-                    feature_id: "unknown".to_string(),
-                    reason: validation
-                        .errors
-                        .first()
-                        .map(|e| e.reason.clone())
-                        .unwrap_or_else(|| "Invalid geometry".to_string()),
-                })
+
+        let exterior = &poly[0];
+        if exterior.len() < 4 {
+            result.add_error(
+                format!("MultiPolygon[{}] exterior", poly_idx),
+                format!("Polygon exterior must have at least 4 points, found {}", exterior.len()),
+            );
+        }
+
+        // Check coordinate validity
+        for (ring_idx, ring) in poly.iter().enumerate() {
+            for (coord_idx, coord) in ring.iter().enumerate() {
+                if !is_valid_coord(coord) {
+                    result.add_error(
+                        format!("MultiPolygon[{}][{}][{}]", poly_idx, ring_idx, coord_idx),
+                        "Coordinates must be finite".to_string(),
+                    );
+                }
             }
         }
     }
+
+    result
 }
 
-/// Count invalid geometries in a collection
-pub fn count_invalid_geometries(geometries: &[Geometry], mode: ValidityMode) -> usize {
-    geometries.iter().filter(|g| !validate_geometry(g, mode).is_valid).count()
+/// Fix a geometry if possible (based on validation mode)
+///
+/// Currently only validates but does not attempt fixes.
+/// In strict mode, returns an error if geometry is invalid.
+/// In lenient mode, returns the geometry as-is (future: attempt fixes).
+pub fn fix_geometry(geometry: &Geometry, mode: ValidityMode) -> Result<Geometry> {
+    let validation = validate_geometry(geometry, mode);
+
+    if !validation.is_valid {
+        match mode {
+            ValidityMode::Strict => {
+                let error_msg = validation
+                    .errors
+                    .iter()
+                    .map(|e| format!("{}: {}", e.location, e.reason))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                return Err(GeoragError::FormatError {
+                    format: "geometry".into(),
+                    message: format!("Invalid geometry: {}", error_msg),
+                });
+            }
+            ValidityMode::Lenient => {
+                // In future: attempt to fix common issues like:
+                // - Unclosed polygon rings
+                // - Duplicate consecutive points
+                // For now, just return as-is
+            }
+        }
+    }
+
+    Ok(geometry.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_point() {
+        let geom = Geometry::point(115.0, -8.5);
+        let result = validate_geometry(&geom, ValidityMode::Strict);
+        assert!(result.is_valid);
+    }
+
+    #[test]
+    fn test_invalid_point_nan() {
+        let geom = Geometry::Point { coordinates: [f64::NAN, 0.0] };
+        let result = validate_geometry(&geom, ValidityMode::Strict);
+        assert!(!result.is_valid);
+    }
+
+    #[test]
+    fn test_valid_polygon() {
+        let geom = Geometry::polygon(vec![vec![
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 0.0],
+        ]]);
+        let result = validate_geometry(&geom, ValidityMode::Strict);
+        assert!(result.is_valid);
+    }
+
+    #[test]
+    fn test_invalid_polygon_too_few_points() {
+        let geom = Geometry::polygon(vec![vec![[0.0, 0.0], [1.0, 0.0]]]);
+        let result = validate_geometry(&geom, ValidityMode::Strict);
+        assert!(!result.is_valid);
+    }
+
+    #[test]
+    fn test_linestring_too_few_points() {
+        let geom = Geometry::LineString { coordinates: vec![[0.0, 0.0]] };
+        let result = validate_geometry(&geom, ValidityMode::Strict);
+        assert!(!result.is_valid);
+    }
 }

@@ -1,4 +1,4 @@
-use crate::models::{Geometry, SpatialFilter, SpatialPredicate};
+use crate::models::{to_geo_geometry, Geometry, SpatialFilter, SpatialPredicate};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::centroid::Centroid;
 use geo::algorithm::contains::Contains;
@@ -29,8 +29,8 @@ pub fn evaluate_spatial_filter(geometry: &Geometry, filter: &SpatialFilter) -> b
 
 /// Check if geometry is within the filter geometry
 fn evaluate_within(geometry: &Geometry, filter: &Geometry) -> bool {
-    let geo_geom: GeoGeometry = geometry.clone().into();
-    let filter_geom: GeoGeometry = filter.clone().into();
+    let geo_geom = to_geo_geometry(geometry);
+    let filter_geom = to_geo_geometry(filter);
 
     // Within means the geometry is completely inside the filter
     filter_geom.contains(&geo_geom)
@@ -38,24 +38,24 @@ fn evaluate_within(geometry: &Geometry, filter: &Geometry) -> bool {
 
 /// Check if geometry intersects the filter geometry
 fn evaluate_intersects(geometry: &Geometry, filter: &Geometry) -> bool {
-    let geo_geom: GeoGeometry = geometry.clone().into();
-    let filter_geom: GeoGeometry = filter.clone().into();
+    let geo_geom = to_geo_geometry(geometry);
+    let filter_geom = to_geo_geometry(filter);
 
     geo_geom.intersects(&filter_geom)
 }
 
 /// Check if geometry contains the filter geometry
 fn evaluate_contains(geometry: &Geometry, filter: &Geometry) -> bool {
-    let geo_geom: GeoGeometry = geometry.clone().into();
-    let filter_geom: GeoGeometry = filter.clone().into();
+    let geo_geom = to_geo_geometry(geometry);
+    let filter_geom = to_geo_geometry(filter);
 
     geo_geom.contains(&filter_geom)
 }
 
 /// Check if geometry's bounding box intersects the filter's bounding box
 fn evaluate_bounding_box(geometry: &Geometry, filter: &Geometry) -> bool {
-    let geo_geom: GeoGeometry = geometry.clone().into();
-    let filter_geom: GeoGeometry = filter.clone().into();
+    let geo_geom = to_geo_geometry(geometry);
+    let filter_geom = to_geo_geometry(filter);
 
     // Get bounding rectangles
     let geom_bbox = match geo_geom.bounding_rect() {
@@ -84,8 +84,8 @@ fn bounding_boxes_intersect(bbox1: &Rect, bbox2: &Rect) -> bool {
 /// Calculate geodesic distance between two geometries in meters
 /// Returns None if centroids cannot be computed (e.g., empty geometries).
 pub fn geodesic_distance(geom1: &Geometry, geom2: &Geometry) -> Option<f64> {
-    let geo1: GeoGeometry = geom1.clone().into();
-    let geo2: GeoGeometry = geom2.clone().into();
+    let geo1 = to_geo_geometry(geom1);
+    let geo2 = to_geo_geometry(geom2);
 
     match (&geo1, &geo2) {
         // Exact point-to-point distance using Haversine
@@ -145,30 +145,29 @@ pub fn count_spatial_matches(geometries: &[Geometry], filter: &SpatialFilter) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Crs;
-    use geo::Point;
+    use crate::models::Distance;
+
+    fn square_polygon() -> Geometry {
+        Geometry::polygon(vec![vec![
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 10.0],
+            [0.0, 10.0],
+            [0.0, 0.0],
+        ]])
+    }
 
     #[test]
     fn test_point_within_polygon() {
-        let square = Geometry::Polygon(geo::Polygon::new(
-            geo::LineString::from(vec![
-                (0.0, 0.0),
-                (10.0, 0.0),
-                (10.0, 10.0),
-                (0.0, 10.0),
-                (0.0, 0.0),
-            ]),
-            vec![],
-        ));
+        let square = square_polygon();
 
         // Point inside the square
-        let point_inside = Geometry::Point(Point::new(5.0, 5.0));
+        let point_inside = Geometry::point(5.0, 5.0);
 
         // Point outside the square
-        let point_outside = Geometry::Point(Point::new(15.0, 15.0));
+        let point_outside = Geometry::point(15.0, 15.0);
 
-        let filter =
-            SpatialFilter::new(SpatialPredicate::Within, Crs::wgs84()).with_geometry(square);
+        let filter = SpatialFilter::new(SpatialPredicate::Within).geometry(square);
 
         assert!(evaluate_spatial_filter(&point_inside, &filter));
         assert!(!evaluate_spatial_filter(&point_outside, &filter));
@@ -177,70 +176,50 @@ mod tests {
     #[test]
     fn test_intersects() {
         // Create two overlapping polygons
-        let poly1 = Geometry::Polygon(geo::Polygon::new(
-            geo::LineString::from(vec![
-                (0.0, 0.0),
-                (10.0, 0.0),
-                (10.0, 10.0),
-                (0.0, 10.0),
-                (0.0, 0.0),
-            ]),
-            vec![],
-        ));
+        let poly1 = Geometry::polygon(vec![vec![
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 10.0],
+            [0.0, 10.0],
+            [0.0, 0.0],
+        ]]);
 
-        let poly2 = Geometry::Polygon(geo::Polygon::new(
-            geo::LineString::from(vec![
-                (5.0, 5.0),
-                (15.0, 5.0),
-                (15.0, 15.0),
-                (5.0, 15.0),
-                (5.0, 5.0),
-            ]),
-            vec![],
-        ));
+        let poly2 = Geometry::polygon(vec![vec![
+            [5.0, 5.0],
+            [15.0, 5.0],
+            [15.0, 15.0],
+            [5.0, 15.0],
+            [5.0, 5.0],
+        ]]);
 
-        let filter =
-            SpatialFilter::new(SpatialPredicate::Intersects, Crs::wgs84()).with_geometry(poly1);
+        let filter = SpatialFilter::new(SpatialPredicate::Intersects).geometry(poly1);
 
         assert!(evaluate_spatial_filter(&poly2, &filter));
     }
 
     #[test]
     fn test_bounding_box() {
-        let point = Geometry::Point(Point::new(5.0, 5.0));
+        let point = Geometry::point(5.0, 5.0);
+        let bbox_geom = square_polygon();
 
-        let bbox_geom = Geometry::Polygon(geo::Polygon::new(
-            geo::LineString::from(vec![
-                (0.0, 0.0),
-                (10.0, 0.0),
-                (10.0, 10.0),
-                (0.0, 10.0),
-                (0.0, 0.0),
-            ]),
-            vec![],
-        ));
-
-        let filter = SpatialFilter::new(SpatialPredicate::BoundingBox, Crs::wgs84())
-            .with_geometry(bbox_geom);
+        let filter = SpatialFilter::new(SpatialPredicate::BoundingBox).geometry(bbox_geom);
 
         assert!(evaluate_spatial_filter(&point, &filter));
     }
 
     #[test]
     fn test_dwithin_point_to_point() {
-        use crate::models::{Distance, DistanceUnit};
+        use crate::models::DistanceUnit;
 
         // Two points in Bali, approximately 1.1km apart
-        // Ubud center: 115.2625, -8.5069
-        // Point ~1.1km east: 115.2725, -8.5069 (0.01 degree ≈ 1.1km at equator)
-        let center_point = Geometry::Point(Point::new(115.2625, -8.5069));
-        let nearby_point = Geometry::Point(Point::new(115.2725, -8.5069));
-        let far_point = Geometry::Point(Point::new(115.3625, -8.5069)); // ~11km away
+        let center_point = Geometry::point(115.2625, -8.5069);
+        let nearby_point = Geometry::point(115.2725, -8.5069);
+        let far_point = Geometry::point(115.3625, -8.5069); // ~11km away
 
         // Test: nearby point should be within 2km
-        let filter_2km = SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84())
-            .with_geometry(center_point.clone())
-            .with_distance(Distance::new(2000.0, DistanceUnit::Meters));
+        let filter_2km = SpatialFilter::new(SpatialPredicate::DWithin)
+            .geometry(center_point.clone())
+            .distance(Distance::new(2000.0, DistanceUnit::Meters));
 
         assert!(
             evaluate_spatial_filter(&nearby_point, &filter_2km),
@@ -248,9 +227,9 @@ mod tests {
         );
 
         // Test: nearby point should NOT be within 500m
-        let filter_500m = SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84())
-            .with_geometry(center_point.clone())
-            .with_distance(Distance::new(500.0, DistanceUnit::Meters));
+        let filter_500m = SpatialFilter::new(SpatialPredicate::DWithin)
+            .geometry(center_point.clone())
+            .distance(Distance::new(500.0, DistanceUnit::Meters));
 
         assert!(
             !evaluate_spatial_filter(&nearby_point, &filter_500m),
@@ -266,49 +245,46 @@ mod tests {
 
     #[test]
     fn test_dwithin_with_kilometers() {
-        use crate::models::{Distance, DistanceUnit};
+        use crate::models::DistanceUnit;
 
-        let point1 = Geometry::Point(Point::new(115.2625, -8.5069));
-        let point2 = Geometry::Point(Point::new(115.3625, -8.5069)); // ~11km away
+        let point1 = Geometry::point(115.2625, -8.5069);
+        let point2 = Geometry::point(115.3625, -8.5069); // ~11km away
 
         // Test with kilometers unit
-        let filter_15km = SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84())
-            .with_geometry(point1.clone())
-            .with_distance(Distance::new(15.0, DistanceUnit::Kilometers));
+        let filter_15km = SpatialFilter::new(SpatialPredicate::DWithin)
+            .geometry(point1.clone())
+            .distance(Distance::new(15.0, DistanceUnit::Kilometers));
 
         assert!(evaluate_spatial_filter(&point2, &filter_15km), "Point should be within 15km");
 
-        let filter_5km = SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84())
-            .with_geometry(point1)
-            .with_distance(Distance::new(5.0, DistanceUnit::Kilometers));
+        let filter_5km = SpatialFilter::new(SpatialPredicate::DWithin)
+            .geometry(point1)
+            .distance(Distance::new(5.0, DistanceUnit::Kilometers));
 
         assert!(!evaluate_spatial_filter(&point2, &filter_5km), "Point should NOT be within 5km");
     }
 
     #[test]
     fn test_dwithin_polygon_to_point() {
-        use crate::models::{Distance, DistanceUnit};
+        use crate::models::DistanceUnit;
 
         // A small parcel polygon in Bali
-        let parcel = Geometry::Polygon(geo::Polygon::new(
-            geo::LineString::from(vec![
-                (115.26, -8.50),
-                (115.27, -8.50),
-                (115.27, -8.51),
-                (115.26, -8.51),
-                (115.26, -8.50),
-            ]),
-            vec![],
-        ));
+        let parcel = Geometry::polygon(vec![vec![
+            [115.26, -8.50],
+            [115.27, -8.50],
+            [115.27, -8.51],
+            [115.26, -8.51],
+            [115.26, -8.50],
+        ]]);
 
         // Point near the parcel centroid
-        let near_point = Geometry::Point(Point::new(115.265, -8.505));
+        let near_point = Geometry::point(115.265, -8.505);
         // Point far from the parcel
-        let far_point = Geometry::Point(Point::new(115.40, -8.50)); // ~15km away
+        let far_point = Geometry::point(115.40, -8.50); // ~15km away
 
-        let filter = SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84())
-            .with_geometry(parcel)
-            .with_distance(Distance::new(5.0, DistanceUnit::Kilometers));
+        let filter = SpatialFilter::new(SpatialPredicate::DWithin)
+            .geometry(parcel)
+            .distance(Distance::new(5.0, DistanceUnit::Kilometers));
 
         assert!(
             evaluate_spatial_filter(&near_point, &filter),
@@ -323,11 +299,10 @@ mod tests {
     #[test]
     fn test_dwithin_requires_distance() {
         // DWithin without distance should return false
-        let point1 = Geometry::Point(Point::new(0.0, 0.0));
-        let point2 = Geometry::Point(Point::new(0.0, 0.0));
+        let point1 = Geometry::point(0.0, 0.0);
+        let point2 = Geometry::point(0.0, 0.0);
 
-        let filter_no_distance =
-            SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84()).with_geometry(point1);
+        let filter_no_distance = SpatialFilter::new(SpatialPredicate::DWithin).geometry(point1);
 
         assert!(
             !evaluate_spatial_filter(&point2, &filter_no_distance),
@@ -337,13 +312,13 @@ mod tests {
 
     #[test]
     fn test_dwithin_requires_geometry() {
-        use crate::models::{Distance, DistanceUnit};
+        use crate::models::DistanceUnit;
 
         // DWithin without geometry should return false
-        let point = Geometry::Point(Point::new(0.0, 0.0));
+        let point = Geometry::point(0.0, 0.0);
 
-        let filter_no_geometry = SpatialFilter::new(SpatialPredicate::DWithin, Crs::wgs84())
-            .with_distance(Distance::new(1000.0, DistanceUnit::Meters));
+        let filter_no_geometry = SpatialFilter::new(SpatialPredicate::DWithin)
+            .distance(Distance::new(1000.0, DistanceUnit::Meters));
 
         assert!(
             !evaluate_spatial_filter(&point, &filter_no_geometry),
@@ -355,8 +330,8 @@ mod tests {
     fn test_geodesic_distance_accuracy() {
         // Test with a known distance
         // Paris (2.3522, 48.8566) to London (0.1276, 51.5074) ≈ 344km
-        let paris = Geometry::Point(Point::new(2.3522, 48.8566));
-        let london = Geometry::Point(Point::new(-0.1276, 51.5074));
+        let paris = Geometry::point(2.3522, 48.8566);
+        let london = Geometry::point(-0.1276, 51.5074);
 
         let distance = geodesic_distance(&paris, &london).expect("Should compute distance");
 
@@ -370,10 +345,11 @@ mod tests {
 
     #[test]
     fn test_geodesic_distance_same_point() {
-        let point = Geometry::Point(Point::new(115.0, -8.0));
+        let point = Geometry::point(115.0, -8.0);
 
         let distance = geodesic_distance(&point, &point).expect("Should compute distance");
 
         assert!(distance < 0.001, "Distance from point to itself should be ~0, got {}", distance);
     }
 }
+

@@ -9,8 +9,8 @@ use axum::{
 };
 use geojson::{Feature, FeatureCollection, Geometry};
 use georag_core::formats::FormatFeature;
-use georag_core::models::query::SpatialPredicate;
-use georag_core::models::{DatasetMeta, SpatialFilter};
+use georag_core::models::{Crs, DatasetMeta, SpatialFilter, SpatialPredicate};
+use georag_core::models::Geometry as CoreGeometry;
 use georag_llm::OllamaEmbedder;
 use georag_retrieval::{QueryPlan, QueryResult, RetrievalPipeline, SourceReference};
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,7 @@ async fn handle_query(
             predicate: SpatialPredicate::BoundingBox,
             geometry: Some(bbox_to_polygon(&bbox)),
             distance: None,
-            crs: 4326,
+            crs: Crs::wgs84(),
         };
         query_plan = query_plan.with_spatial_filter(spatial_filter);
     }
@@ -264,14 +264,14 @@ async fn handle_ingest(
         .into_iter()
         .enumerate()
         .filter_map(|(i, f)| {
-            f.geometry.map(|geom| {
-                georag_core::models::Feature::with_geometry(
-                    georag_core::models::FeatureId(i as u64),
-                    geom,
-                    f.properties,
-                    crs,
-                )
-            })
+            // Convert serde_json::Value to typed Geometry
+            let geom = f.geometry.as_ref().and_then(CoreGeometry::from_geojson)?;
+            Some(georag_core::models::Feature::with_geometry(
+                georag_core::models::FeatureId(i as u64),
+                geom,
+                f.properties,
+                crs,
+            ))
         })
         .collect();
 
@@ -300,18 +300,15 @@ async fn handle_ingest(
     }))
 }
 
-fn bbox_to_polygon(bbox: &[f64; 4]) -> JsonValue {
+fn bbox_to_polygon(bbox: &[f64; 4]) -> CoreGeometry {
     let [min_lng, min_lat, max_lng, max_lat] = *bbox;
-    serde_json::json!({
-        "type": "Polygon",
-        "coordinates": [[
-            [min_lng, min_lat],
-            [max_lng, min_lat],
-            [max_lng, max_lat],
-            [min_lng, max_lat],
-            [min_lng, min_lat]
-        ]]
-    })
+    CoreGeometry::polygon(vec![vec![
+        [min_lng, min_lat],
+        [max_lng, min_lat],
+        [max_lng, max_lat],
+        [min_lng, max_lat],
+        [min_lng, min_lat],
+    ]])
 }
 
 fn dataset_meta_to_info(meta: &DatasetMeta) -> DatasetInfo {
@@ -384,6 +381,8 @@ async fn query_result_to_geojson(result: &QueryResult, state: &AppState) -> Feat
 async fn get_geometry_for_source(source: &SourceReference, state: &AppState) -> Option<Geometry> {
     let feature_id = source.feature_id?;
     let feature = state.spatial_store.get_feature(feature_id).await.ok()??;
-    let geom_value = feature.geometry?;
+    let geom = feature.geometry?;
+    // Convert the typed geometry to GeoJSON
+    let geom_value = geom.to_geojson();
     geojson::Geometry::from_json_value(geom_value).ok()
 }

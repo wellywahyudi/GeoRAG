@@ -211,12 +211,10 @@ mod tests {
     }
 
     fn create_test_feature(id: u64, properties: HashMap<String, serde_json::Value>) -> Feature {
+        use crate::models::Geometry;
         Feature {
             id: FeatureId(id),
-            geometry: Some(serde_json::json!({
-                "type": "Point",
-                "coordinates": [0.0, 0.0]
-            })),
+            geometry: Some(Geometry::point(0.0, 0.0)),
             properties,
             crs: 4326,
         }

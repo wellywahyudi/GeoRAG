@@ -141,7 +141,7 @@ where
                 .as_ref()
                 .map(|f| format!("{:?}", f.predicate))
                 .unwrap_or_else(|| "None".to_string()),
-            crs: plan.spatial_filter.as_ref().map(|f| f.crs).unwrap_or(4326),
+            crs: plan.spatial_filter.as_ref().map(|f| f.crs.epsg).unwrap_or(4326),
             features_evaluated,
             features_matched,
             distance_threshold: plan

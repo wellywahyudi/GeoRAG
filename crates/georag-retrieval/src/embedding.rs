@@ -1,5 +1,5 @@
 use georag_core::error::Result;
-use georag_core::models::{Embedding, FeatureId, SpatialMetadata, TextChunk};
+use georag_core::models::{Embedding, FeatureId, Geometry, SpatialMetadata, TextChunk};
 use georag_llm::ports::Embedder;
 use std::sync::Arc;
 
@@ -136,64 +136,38 @@ impl<E: Embedder> EmbeddingPipeline<E> {
     }
 }
 
-/// Extract bounding box from GeoJSON-like geometry
-fn extract_bbox(geometry: &Option<serde_json::Value>) -> Option<[f64; 4]> {
+/// Extract bounding box from typed Geometry
+fn extract_bbox(geometry: &Option<Geometry>) -> Option<[f64; 4]> {
     let geom = geometry.as_ref()?;
 
-    // Try to extract coordinates from the geometry
-    let coords = geom.get("coordinates")?;
-
-    // Handle different geometry types
-    match geom.get("type")?.as_str()? {
-        "Point" => {
-            // For Point: coordinates are [x, y]
-            let arr = coords.as_array()?;
-            if arr.len() >= 2 {
-                let x = arr[0].as_f64()?;
-                let y = arr[1].as_f64()?;
-                Some([x, y, x, y])
-            } else {
-                None
-            }
+    match geom {
+        Geometry::Point { coordinates } => {
+            Some([coordinates[0], coordinates[1], coordinates[0], coordinates[1]])
         }
-        "LineString" | "MultiPoint" => {
-            // For LineString/MultiPoint: coordinates are [[x, y], ...]
-            let points = coords.as_array()?;
-            compute_bbox_from_points(points)
+        Geometry::LineString { coordinates } => compute_bbox_from_coords(coordinates),
+        Geometry::MultiPoint { coordinates } => compute_bbox_from_coords(coordinates),
+        Geometry::Polygon { coordinates } => {
+            let all_coords: Vec<[f64; 2]> = coordinates.iter().flatten().cloned().collect();
+            compute_bbox_from_coords(&all_coords)
         }
-        "Polygon" | "MultiLineString" => {
-            // For Polygon/MultiLineString: coordinates are [[[x, y], ...], ...]
-            let rings = coords.as_array()?;
-            let mut all_points = Vec::new();
-            for ring in rings {
-                if let Some(points) = ring.as_array() {
-                    all_points.extend_from_slice(points);
-                }
-            }
-            compute_bbox_from_points(&all_points)
+        Geometry::MultiLineString { coordinates } => {
+            let all_coords: Vec<[f64; 2]> = coordinates.iter().flatten().cloned().collect();
+            compute_bbox_from_coords(&all_coords)
         }
-        "MultiPolygon" => {
-            // For MultiPolygon: coordinates are [[[[x, y], ...], ...], ...]
-            let polygons = coords.as_array()?;
-            let mut all_points = Vec::new();
-            for polygon in polygons {
-                if let Some(rings) = polygon.as_array() {
-                    for ring in rings {
-                        if let Some(points) = ring.as_array() {
-                            all_points.extend_from_slice(points);
-                        }
-                    }
-                }
-            }
-            compute_bbox_from_points(&all_points)
+        Geometry::MultiPolygon { coordinates } => {
+            let all_coords: Vec<[f64; 2]> = coordinates
+                .iter()
+                .flat_map(|poly| poly.iter().flatten())
+                .cloned()
+                .collect();
+            compute_bbox_from_coords(&all_coords)
         }
-        _ => None,
     }
 }
 
-/// Compute bounding box from an array of coordinate points
-fn compute_bbox_from_points(points: &[serde_json::Value]) -> Option<[f64; 4]> {
-    if points.is_empty() {
+/// Compute bounding box from an array of coordinate pairs
+fn compute_bbox_from_coords(coords: &[[f64; 2]]) -> Option<[f64; 4]> {
+    if coords.is_empty() {
         return None;
     }
 
@@ -202,17 +176,11 @@ fn compute_bbox_from_points(points: &[serde_json::Value]) -> Option<[f64; 4]> {
     let mut max_x = f64::NEG_INFINITY;
     let mut max_y = f64::NEG_INFINITY;
 
-    for point in points {
-        let arr = point.as_array()?;
-        if arr.len() >= 2 {
-            let x = arr[0].as_f64()?;
-            let y = arr[1].as_f64()?;
-
-            min_x = min_x.min(x);
-            min_y = min_y.min(y);
-            max_x = max_x.max(x);
-            max_y = max_y.max(y);
-        }
+    for coord in coords {
+        min_x = min_x.min(coord[0]);
+        min_y = min_y.min(coord[1]);
+        max_x = max_x.max(coord[0]);
+        max_y = max_y.max(coord[1]);
     }
 
     if min_x.is_finite() && min_y.is_finite() && max_x.is_finite() && max_y.is_finite() {

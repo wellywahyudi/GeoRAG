@@ -6,7 +6,6 @@
 
 use async_trait::async_trait;
 use georag_core::error::Result;
-use georag_core::models::query::{DistanceUnit, SpatialPredicate};
 use georag_core::models::{
     ChunkId, Dataset, DatasetId, DatasetMeta, Embedding, Feature, FeatureId, ScoredResult,
     SpatialFilter, TextChunk,
@@ -95,38 +94,21 @@ impl SpatialStore for MemorySpatialStore {
     async fn spatial_query(&self, filter: &SpatialFilter) -> Result<Vec<Feature>> {
         let features = self.features.read().unwrap();
 
-        // Convert georag_core::models::SpatialFilter to georag_geo::models::SpatialFilter
-        let _geo_filter = georag_geo::models::SpatialFilter {
-            predicate: match filter.predicate {
-                SpatialPredicate::Within => georag_geo::models::SpatialPredicate::Within,
-                SpatialPredicate::Intersects => georag_geo::models::SpatialPredicate::Intersects,
-                SpatialPredicate::Contains => georag_geo::models::SpatialPredicate::Contains,
-                SpatialPredicate::BoundingBox => georag_geo::models::SpatialPredicate::BoundingBox,
-                SpatialPredicate::DWithin => georag_geo::models::SpatialPredicate::DWithin,
-            },
-            geometry: filter.geometry.as_ref().and({
-                // Convert serde_json::Value to georag_geo::models::Geometry
-                // For now, return None - this would need proper GeoJSON parsing
-                None
-            }),
-            distance: filter.distance.map(|d| georag_geo::models::Distance {
-                value: d.value,
-                unit: match d.unit {
-                    DistanceUnit::Meters => georag_geo::models::DistanceUnit::Meters,
-                    DistanceUnit::Kilometers => georag_geo::models::DistanceUnit::Kilometers,
-                    DistanceUnit::Miles => georag_geo::models::DistanceUnit::Miles,
-                    DistanceUnit::Feet => georag_geo::models::DistanceUnit::Feet,
-                },
-            }),
-            crs: georag_geo::models::Crs::new(filter.crs, ""),
-        };
-
         Ok(features
             .values()
-            .filter(|_feature| {
-                // Convert feature geometry from serde_json::Value to georag_geo::models::Geometry
-                // For now, skip spatial filtering - this would need proper GeoJSON parsing
-                true
+            .filter(|feature| {
+                // If no filter geometry, include all features
+                if filter.geometry.is_none() {
+                    return true;
+                }
+
+                // Get feature geometry
+                let Some(ref feature_geom) = feature.geometry else {
+                    return false; // No geometry, can't match spatial filter
+                };
+
+                // Apply spatial filter directly (types are now unified!)
+                georag_geo::spatial::evaluate_spatial_filter(feature_geom, filter)
             })
             .cloned()
             .collect())
