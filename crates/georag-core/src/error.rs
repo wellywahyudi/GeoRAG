@@ -24,8 +24,8 @@ pub enum GeoragError {
     InvalidGeometry { feature_id: String, reason: String },
 
     // Index errors
-    #[error("Index not built. Run 'georag build' first")]
-    IndexNotBuilt,
+    #[error("Index not built: {0}")]
+    IndexNotBuilt(String),
 
     #[error("Index is stale. Rebuild required after dataset changes")]
     IndexStale,

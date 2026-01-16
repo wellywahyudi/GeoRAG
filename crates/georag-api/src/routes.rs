@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use chrono::{DateTime, Utc};
 use geojson::{Feature, FeatureCollection, Geometry};
 use georag_core::formats::FormatFeature;
 use georag_core::models::Geometry as CoreGeometry;
@@ -53,12 +54,30 @@ pub struct ErrorResponse {
     pub details: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct IndexIntegrityResponse {
+    pub hash: String,
+    pub built_at: DateTime<Utc>,
+    pub embedder: String,
+    pub chunk_count: usize,
+    pub embedding_dim: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VerifyResponse {
+    pub stored_hash: String,
+    pub computed_hash: String,
+    pub matches: bool,
+}
+
 pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/api/v1/query", post(handle_query))
         .route("/api/v1/datasets", get(handle_list_datasets))
         .route("/api/v1/ingest", post(handle_ingest))
+        .route("/api/v1/index/integrity", get(get_index_integrity))
+        .route("/api/v1/index/verify", post(verify_index))
         .with_state(state)
 }
 
@@ -382,7 +401,60 @@ async fn get_geometry_for_source(source: &SourceReference, state: &AppState) -> 
     let feature_id = source.feature_id?;
     let feature = state.spatial_store.get_feature(feature_id).await.ok()??;
     let geom = feature.geometry?;
-    // Convert the typed geometry to GeoJSON
     let geom_value = geom.to_geojson();
     geojson::Geometry::from_json_value(geom_value).ok()
+}
+
+/// GET /api/v1/index/integrity - Returns current index state
+async fn get_index_integrity(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<IndexIntegrityResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let index_state = state.get_index_state().await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: "Index not found".to_string(),
+                details: Some(e.to_string()),
+            }),
+        )
+    })?;
+
+    Ok(Json(IndexIntegrityResponse {
+        hash: index_state.hash,
+        built_at: index_state.built_at,
+        embedder: index_state.embedder,
+        chunk_count: index_state.chunk_count,
+        embedding_dim: index_state.embedding_dim,
+    }))
+}
+
+/// POST /api/v1/index/verify - Recompute hash and verify integrity
+async fn verify_index(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<VerifyResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let stored_state = state.get_index_state().await.map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: "Index not found".to_string(),
+                details: Some(e.to_string()),
+            }),
+        )
+    })?;
+
+    let computed_hash = state.compute_index_hash().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "Failed to compute hash".to_string(),
+                details: Some(e.to_string()),
+            }),
+        )
+    })?;
+
+    Ok(Json(VerifyResponse {
+        stored_hash: stored_state.hash.clone(),
+        computed_hash: computed_hash.clone(),
+        matches: stored_state.hash == computed_hash,
+    }))
 }
