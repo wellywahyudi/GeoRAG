@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use axum::http::{header, HeaderValue, Method};
 use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore};
+use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
+use georag_store::postgres::{PostgresConfig, PostgresStore};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -34,12 +36,40 @@ async fn main() {
         "Starting GeoRAG API server"
     );
 
-    // TODO: Add PostgreSQL support via DATABASE_URL env var
-    let spatial_store = Arc::new(MemorySpatialStore::new());
-    let vector_store = Arc::new(MemoryVectorStore::new());
-    let document_store = Arc::new(MemoryDocumentStore::new());
-
-    tracing::info!("Using in-memory storage");
+    // Initialize storage backend based on DATABASE_URL environment variable
+    let (spatial_store, vector_store, document_store): (
+        Arc<dyn SpatialStore>,
+        Arc<dyn VectorStore>,
+        Arc<dyn DocumentStore>,
+    ) = match env::var("DATABASE_URL") {
+        Ok(database_url) => {
+            tracing::info!("DATABASE_URL found, connecting to PostgreSQL...");
+            match init_postgres_storage(&database_url).await {
+                Ok(store) => {
+                    tracing::info!("Connected to PostgreSQL");
+                    (store.clone(), store.clone(), store)
+                }
+                Err(e) => {
+                    tracing::error!("Failed to connect to PostgreSQL: {}", e);
+                    tracing::error!(
+                        "Remediation:\n\
+                        1. Ensure PostgreSQL is running\n\
+                        2. Verify DATABASE_URL is correct\n\
+                        3. Check that the database exists and is accessible"
+                    );
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(_) => {
+            tracing::info!("Using in-memory storage (set DATABASE_URL for PostgreSQL)");
+            (
+                Arc::new(MemorySpatialStore::new()),
+                Arc::new(MemoryVectorStore::new()),
+                Arc::new(MemoryDocumentStore::new()),
+            )
+        }
+    };
 
     let state = Arc::new(AppState::new(
         spatial_store,
@@ -65,4 +95,15 @@ async fn main() {
     tracing::info!("CORS enabled for http://localhost:3000");
 
     axum::serve(listener, app).await.unwrap();
+}
+
+/// Initialize PostgreSQL storage from a database URL
+async fn init_postgres_storage(database_url: &str) -> Result<Arc<PostgresStore>, String> {
+    let config = PostgresConfig::from_database_url(database_url)
+        .map_err(|e| format!("Invalid DATABASE_URL: {}", e))?;
+
+    PostgresStore::with_migrations(config)
+        .await
+        .map(Arc::new)
+        .map_err(|e| format!("Connection failed: {}", e))
 }

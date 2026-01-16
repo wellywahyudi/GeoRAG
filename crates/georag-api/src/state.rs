@@ -55,7 +55,9 @@ impl AppState {
     /// Get the current index state
     pub async fn get_index_state(&self) -> Result<IndexState> {
         let guard = self.index_state.read().await;
-        guard.clone().ok_or_else(|| GeoragError::IndexNotBuilt("Index has not been built yet".to_string()))
+        guard
+            .clone()
+            .ok_or_else(|| GeoragError::IndexNotBuilt("Index has not been built yet".to_string()))
     }
 
     /// Compute current index hash from stored data
