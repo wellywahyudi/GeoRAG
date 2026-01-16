@@ -13,7 +13,7 @@ use georag_core::models::{
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::ports::{DocumentStore, SpatialStore, VectorStore};
+use crate::ports::{DocumentStore, SpatialStore, Transaction, Transactional, VectorStore};
 
 /// In-memory implementation of SpatialStore
 #[derive(Debug, Clone, Default)]
@@ -38,6 +38,68 @@ impl MemorySpatialStore {
     ) {
         let mut dataset_features = self.dataset_features.write().unwrap();
         dataset_features.entry(dataset_id).or_default().extend(feature_ids);
+    }
+
+    /// Create a snapshot of the current state for transaction support
+    fn create_snapshot(&self) -> MemoryStoreSnapshot {
+        MemoryStoreSnapshot {
+            datasets: self.datasets.read().unwrap().clone(),
+            features: self.features.read().unwrap().clone(),
+            dataset_features: self.dataset_features.read().unwrap().clone(),
+            next_id: *self.next_id.read().unwrap(),
+        }
+    }
+
+    /// Restore state from a snapshot (for rollback)
+    fn restore_snapshot(&self, snapshot: MemoryStoreSnapshot) {
+        *self.datasets.write().unwrap() = snapshot.datasets;
+        *self.features.write().unwrap() = snapshot.features;
+        *self.dataset_features.write().unwrap() = snapshot.dataset_features;
+        *self.next_id.write().unwrap() = snapshot.next_id;
+    }
+}
+
+/// Snapshot of MemorySpatialStore state for transaction rollback
+#[derive(Clone)]
+struct MemoryStoreSnapshot {
+    datasets: HashMap<DatasetId, Dataset>,
+    features: HashMap<FeatureId, Feature>,
+    dataset_features: HashMap<DatasetId, Vec<FeatureId>>,
+    next_id: u64,
+}
+
+/// Transaction for MemorySpatialStore
+pub struct MemorySpatialTransaction {
+    snapshot: MemoryStoreSnapshot,
+    store: MemorySpatialStore,
+    committed: bool,
+}
+
+#[async_trait]
+impl Transaction for MemorySpatialTransaction {
+    async fn commit(mut self: Box<Self>) -> Result<()> {
+        self.committed = true;
+        Ok(())
+    }
+
+    async fn rollback(self: Box<Self>) -> Result<()> {
+        if !self.committed {
+            self.store.restore_snapshot(self.snapshot);
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Transactional for MemorySpatialStore {
+    type Tx = MemorySpatialTransaction;
+
+    async fn begin_transaction(&self) -> Result<Self::Tx> {
+        Ok(MemorySpatialTransaction {
+            snapshot: self.create_snapshot(),
+            store: self.clone(),
+            committed: false,
+        })
     }
 }
 
@@ -269,5 +331,104 @@ impl DocumentStore for MemoryDocumentStore {
     async fn list_chunk_ids(&self) -> Result<Vec<ChunkId>> {
         let chunks = self.chunks.read().unwrap();
         Ok(chunks.keys().copied().collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use std::path::PathBuf;
+
+    fn create_test_dataset(name: &str) -> Dataset {
+        Dataset {
+            id: DatasetId(0),
+            name: name.to_string(),
+            path: PathBuf::from(format!("/tmp/{}.geojson", name)),
+            geometry_type: georag_core::models::dataset::GeometryType::Point,
+            feature_count: 0,
+            crs: 4326,
+            format: georag_core::models::dataset::FormatMetadata {
+                format_name: "GeoJSON".to_string(),
+                format_version: None,
+                layer_name: None,
+                page_count: None,
+                paragraph_count: None,
+                extraction_method: None,
+                spatial_association: None,
+            },
+            added_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_transaction_commit() {
+        let store = MemorySpatialStore::new();
+
+        // Begin transaction
+        let tx = store.begin_transaction().await.unwrap();
+
+        // Store dataset
+        let dataset = create_test_dataset("test1");
+        let id = store.store_dataset(&dataset).await.unwrap();
+
+        // Commit
+        Box::new(tx).commit().await.unwrap();
+
+        // Dataset should still exist
+        let retrieved = store.get_dataset(id).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().name, "test1");
+    }
+
+    #[tokio::test]
+    async fn test_transaction_rollback() {
+        let store = MemorySpatialStore::new();
+
+        // Store initial dataset
+        let dataset1 = create_test_dataset("before_tx");
+        let id1 = store.store_dataset(&dataset1).await.unwrap();
+
+        // Begin transaction
+        let tx = store.begin_transaction().await.unwrap();
+
+        // Store another dataset
+        let dataset2 = create_test_dataset("during_tx");
+        let id2 = store.store_dataset(&dataset2).await.unwrap();
+
+        // Verify both exist before rollback
+        assert!(store.get_dataset(id1).await.unwrap().is_some());
+        assert!(store.get_dataset(id2).await.unwrap().is_some());
+
+        // Rollback
+        Box::new(tx).rollback().await.unwrap();
+
+        // First dataset should still exist, second should be gone
+        assert!(store.get_dataset(id1).await.unwrap().is_some());
+        assert!(store.get_dataset(id2).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_transaction_rollback_restores_next_id() {
+        let store = MemorySpatialStore::new();
+
+        // Store initial dataset
+        let dataset1 = create_test_dataset("first");
+        store.store_dataset(&dataset1).await.unwrap();
+
+        // Begin transaction
+        let tx = store.begin_transaction().await.unwrap();
+
+        // Store datasets in transaction
+        store.store_dataset(&create_test_dataset("second")).await.unwrap();
+        store.store_dataset(&create_test_dataset("third")).await.unwrap();
+
+        // Rollback
+        Box::new(tx).rollback().await.unwrap();
+
+        // Next ID should be back to 1 (after first dataset)
+        let next_dataset = create_test_dataset("after_rollback");
+        let id = store.store_dataset(&next_dataset).await.unwrap();
+        assert_eq!(id.0, 1); // Should be 1, not 3
     }
 }

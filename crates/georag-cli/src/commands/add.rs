@@ -404,12 +404,21 @@ async fn execute_single(
     let dataset_id = storage.spatial.store_dataset(&dataset).await?;
 
     // Copy dataset file to workspace (for backward compatibility with file-based operations)
+    // This is wrapped in transaction-like logic: if copy fails, we clean up the database entry
     let datasets_dir = georag_dir.join("datasets");
     fs::create_dir_all(&datasets_dir)?;
     let dataset_filename =
         format!("{}_{}", dataset_id.0, args.path.file_name().unwrap().to_str().unwrap());
     let dest_path = datasets_dir.join(&dataset_filename);
-    fs::copy(&args.path, &dest_path)?;
+
+    if let Err(copy_err) = fs::copy(&args.path, &dest_path) {
+        // Rollback: remove dataset from database since file copy failed
+        if let Err(rollback_err) = storage.spatial.delete_dataset(dataset_id).await {
+            output
+                .warning(format!("Failed to rollback dataset after copy error: {}", rollback_err));
+        }
+        return Err(copy_err).context("Failed to copy dataset file to workspace");
+    }
 
     // Output success
     if output.is_json() {

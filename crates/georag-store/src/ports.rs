@@ -77,3 +77,23 @@ pub trait DocumentStore: Send + Sync {
     /// List all chunk IDs
     async fn list_chunk_ids(&self) -> Result<Vec<ChunkId>>;
 }
+
+/// Transaction handler
+#[async_trait]
+pub trait Transaction: Send + Sync {
+    /// Commit all changes in this transaction
+    async fn commit(self: Box<Self>) -> Result<()>;
+
+    /// Rollback all changes in this transaction
+    async fn rollback(self: Box<Self>) -> Result<()>;
+}
+
+/// Trait for stores that support transactions
+#[async_trait]
+pub trait Transactional {
+    /// The transaction type for this store
+    type Tx: Transaction;
+
+    /// Begin a new transaction
+    async fn begin_transaction(&self) -> Result<Self::Tx>;
+}
