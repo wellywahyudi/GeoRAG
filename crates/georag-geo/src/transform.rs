@@ -109,7 +109,11 @@ pub fn reproject_geometry(geometry: &Geometry, from_crs: &Crs, to_crs: &Crs) -> 
 }
 
 /// Alias for [`reproject_geometry`] with domain-specific naming.
-pub fn normalize_geometry(geometry: &Geometry, from_crs: &Crs, target_crs: &Crs) -> Result<Geometry> {
+pub fn normalize_geometry(
+    geometry: &Geometry,
+    from_crs: &Crs,
+    target_crs: &Crs,
+) -> Result<Geometry> {
     reproject_geometry(geometry, from_crs, target_crs)
 }
 
@@ -118,7 +122,10 @@ pub fn normalize_geometries(
     geometries: &[(Geometry, Crs)],
     target_crs: &Crs,
 ) -> Result<Vec<Geometry>> {
-    geometries.iter().map(|(geom, crs)| normalize_geometry(geom, crs, target_crs)).collect()
+    geometries
+        .iter()
+        .map(|(geom, crs)| normalize_geometry(geom, crs, target_crs))
+        .collect()
 }
 
 #[cfg(test)]

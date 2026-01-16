@@ -142,24 +142,12 @@ pub enum GeometryType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Geometry {
-    Point {
-        coordinates: [f64; 2],
-    },
-    LineString {
-        coordinates: Vec<[f64; 2]>,
-    },
-    Polygon {
-        coordinates: Vec<Vec<[f64; 2]>>,
-    },
-    MultiPoint {
-        coordinates: Vec<[f64; 2]>,
-    },
-    MultiLineString {
-        coordinates: Vec<Vec<[f64; 2]>>,
-    },
-    MultiPolygon {
-        coordinates: Vec<Vec<Vec<[f64; 2]>>>,
-    },
+    Point { coordinates: [f64; 2] },
+    LineString { coordinates: Vec<[f64; 2]> },
+    Polygon { coordinates: Vec<Vec<[f64; 2]>> },
+    MultiPoint { coordinates: Vec<[f64; 2]> },
+    MultiLineString { coordinates: Vec<Vec<[f64; 2]>> },
+    MultiPolygon { coordinates: Vec<Vec<Vec<[f64; 2]>>> },
 }
 
 impl Geometry {

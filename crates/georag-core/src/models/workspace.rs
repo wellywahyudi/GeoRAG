@@ -4,6 +4,9 @@ use std::path::PathBuf;
 
 use super::DatasetMeta;
 
+// Re-export from geometry module (single source of truth)
+pub use super::geometry::{DistanceUnit, ValidityMode};
+
 /// Workspace configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
@@ -15,22 +18,6 @@ pub struct WorkspaceConfig {
 
     /// Geometry validity mode
     pub geometry_validity: ValidityMode,
-}
-
-/// Distance unit for spatial operations
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DistanceUnit {
-    Meters,
-    Kilometers,
-    Miles,
-    Feet,
-}
-
-/// Geometry validity mode
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ValidityMode {
-    Strict,
-    Lenient,
 }
 
 /// Workspace state

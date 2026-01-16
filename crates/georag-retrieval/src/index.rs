@@ -1,6 +1,8 @@
 use chrono::Utc;
 use georag_core::error::Result;
-use georag_core::models::{Embedding, IndexState, SpatialFilter, SpatialMetadata, SpatialPredicate, TextChunk};
+use georag_core::models::{
+    Embedding, IndexState, SpatialFilter, SpatialMetadata, SpatialPredicate, TextChunk,
+};
 use georag_geo::models::{Crs, ValidityMode};
 use georag_geo::validation::validate_geometry;
 use georag_llm::ports::Embedder;

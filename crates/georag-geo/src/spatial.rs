@@ -211,7 +211,7 @@ mod tests {
     fn test_dwithin_point_to_point() {
         use crate::models::DistanceUnit;
 
-        // Two points in Bali, approximately 1.1km apart
+        // Two points, approximately 1.1km apart
         let center_point = Geometry::point(115.2625, -8.5069);
         let nearby_point = Geometry::point(115.2725, -8.5069);
         let far_point = Geometry::point(115.3625, -8.5069); // ~11km away
@@ -268,7 +268,7 @@ mod tests {
     fn test_dwithin_polygon_to_point() {
         use crate::models::DistanceUnit;
 
-        // A small parcel polygon in Bali
+        // A small parcel polygon
         let parcel = Geometry::polygon(vec![vec![
             [115.26, -8.50],
             [115.27, -8.50],
@@ -352,4 +352,3 @@ mod tests {
         assert!(distance < 0.001, "Distance from point to itself should be ~0, got {}", distance);
     }
 }
-

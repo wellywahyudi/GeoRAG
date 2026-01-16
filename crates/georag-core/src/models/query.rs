@@ -35,7 +35,12 @@ impl Feature {
         properties: HashMap<String, serde_json::Value>,
         crs: u32,
     ) -> Self {
-        Self { id, geometry: Some(geometry), properties, crs }
+        Self {
+            id,
+            geometry: Some(geometry),
+            properties,
+            crs,
+        }
     }
 
     /// Create a new feature without geometry (for documents)

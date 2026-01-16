@@ -77,7 +77,8 @@ fn validate_linestring(coords: &[[f64; 2]]) -> ValidationResult {
 
     for (i, coord) in coords.iter().enumerate() {
         if !is_valid_coord(coord) {
-            result.add_error(format!("LineString[{}]", i), "Coordinates must be finite".to_string());
+            result
+                .add_error(format!("LineString[{}]", i), "Coordinates must be finite".to_string());
         }
     }
 
@@ -103,7 +104,10 @@ fn validate_polygon(rings: &[Vec<[f64; 2]>]) -> ValidationResult {
     // Check if exterior is closed
     if let (Some(first), Some(last)) = (exterior.first(), exterior.last()) {
         if first != last {
-            result.add_error("Polygon exterior".to_string(), "Polygon exterior ring is not closed".to_string());
+            result.add_error(
+                "Polygon exterior".to_string(),
+                "Polygon exterior ring is not closed".to_string(),
+            );
         }
     }
 
@@ -127,7 +131,8 @@ fn validate_multipoint(coords: &[[f64; 2]]) -> ValidationResult {
 
     for (i, coord) in coords.iter().enumerate() {
         if !is_valid_coord(coord) {
-            result.add_error(format!("MultiPoint[{}]", i), "Coordinates must be finite".to_string());
+            result
+                .add_error(format!("MultiPoint[{}]", i), "Coordinates must be finite".to_string());
         }
     }
 
@@ -248,12 +253,7 @@ mod tests {
 
     #[test]
     fn test_valid_polygon() {
-        let geom = Geometry::polygon(vec![vec![
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 1.0],
-            [0.0, 0.0],
-        ]]);
+        let geom = Geometry::polygon(vec![vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]]]);
         let result = validate_geometry(&geom, ValidityMode::Strict);
         assert!(result.is_valid);
     }

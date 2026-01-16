@@ -101,9 +101,9 @@ pub fn from_geo_geometry(geom: &GeoGeometry) -> Geometry {
             }
             Geometry::Polygon { coordinates: rings }
         }
-        GeoGeometry::MultiPoint(mp) => {
-            Geometry::MultiPoint { coordinates: mp.iter().map(|p| [p.x(), p.y()]).collect() }
-        }
+        GeoGeometry::MultiPoint(mp) => Geometry::MultiPoint {
+            coordinates: mp.iter().map(|p| [p.x(), p.y()]).collect(),
+        },
         GeoGeometry::MultiLineString(mls) => Geometry::MultiLineString {
             coordinates: mls.iter().map(|ls| ls.coords().map(|c| [c.x, c.y]).collect()).collect(),
         },

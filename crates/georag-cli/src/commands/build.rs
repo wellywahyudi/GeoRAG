@@ -325,7 +325,9 @@ fn generate_content_hash(
 }
 
 /// Extract bounding box from typed Geometry
-fn extract_bbox_from_geometry(geometry: &Option<georag_core::models::Geometry>) -> Option<[f64; 4]> {
+fn extract_bbox_from_geometry(
+    geometry: &Option<georag_core::models::Geometry>,
+) -> Option<[f64; 4]> {
     use georag_core::models::Geometry;
     let geom = geometry.as_ref()?;
 
@@ -344,11 +346,8 @@ fn extract_bbox_from_geometry(geometry: &Option<georag_core::models::Geometry>) 
             compute_bbox_from_coords(&all_coords)
         }
         Geometry::MultiPolygon { coordinates } => {
-            let all_coords: Vec<[f64; 2]> = coordinates
-                .iter()
-                .flat_map(|poly| poly.iter().flatten())
-                .cloned()
-                .collect();
+            let all_coords: Vec<[f64; 2]> =
+                coordinates.iter().flat_map(|poly| poly.iter().flatten()).cloned().collect();
             compute_bbox_from_coords(&all_coords)
         }
     }

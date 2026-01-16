@@ -9,8 +9,8 @@ use axum::{
 };
 use geojson::{Feature, FeatureCollection, Geometry};
 use georag_core::formats::FormatFeature;
-use georag_core::models::{Crs, DatasetMeta, SpatialFilter, SpatialPredicate};
 use georag_core::models::Geometry as CoreGeometry;
+use georag_core::models::{Crs, DatasetMeta, SpatialFilter, SpatialPredicate};
 use georag_llm::OllamaEmbedder;
 use georag_retrieval::{QueryPlan, QueryResult, RetrievalPipeline, SourceReference};
 use serde::{Deserialize, Serialize};

@@ -155,11 +155,8 @@ fn extract_bbox(geometry: &Option<Geometry>) -> Option<[f64; 4]> {
             compute_bbox_from_coords(&all_coords)
         }
         Geometry::MultiPolygon { coordinates } => {
-            let all_coords: Vec<[f64; 2]> = coordinates
-                .iter()
-                .flat_map(|poly| poly.iter().flatten())
-                .cloned()
-                .collect();
+            let all_coords: Vec<[f64; 2]> =
+                coordinates.iter().flat_map(|poly| poly.iter().flatten()).cloned().collect();
             compute_bbox_from_coords(&all_coords)
         }
     }

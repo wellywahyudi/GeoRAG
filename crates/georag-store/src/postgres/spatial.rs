@@ -416,8 +416,8 @@ impl SpatialStore for PostgresStore {
         match row {
             Some(row) => {
                 let geometry_str: String = row.get("geometry");
-                let geometry_json: serde_json::Value =
-                    serde_json::from_str(&geometry_str).map_err(|e| {
+                let geometry_json: serde_json::Value = serde_json::from_str(&geometry_str)
+                    .map_err(|e| {
                         GeoragError::Serialization(format!("Failed to parse geometry: {}", e))
                     })?;
                 let geometry = Geometry::from_geojson(&geometry_json);
