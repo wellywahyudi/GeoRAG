@@ -194,7 +194,7 @@ mod tests {
             id: DatasetId(1),
             name: "test_dataset".to_string(),
             path: PathBuf::from("test.geojson"),
-            geometry_type: crate::models::dataset::GeometryType::Point,
+            geometry_type: crate::models::GeometryType::Point,
             feature_count: 1,
             crs: 4326,
             format: crate::models::dataset::FormatMetadata {

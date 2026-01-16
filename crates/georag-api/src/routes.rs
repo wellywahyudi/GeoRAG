@@ -338,8 +338,8 @@ fn dataset_meta_to_info(meta: &DatasetMeta) -> DatasetInfo {
     }
 }
 
-fn detect_geometry_type(features: &[FormatFeature]) -> georag_core::models::dataset::GeometryType {
-    use georag_core::models::dataset::GeometryType;
+fn detect_geometry_type(features: &[FormatFeature]) -> georag_core::models::GeometryType {
+    use georag_core::models::GeometryType;
 
     for feature in features {
         if let Some(ref geometry) = feature.geometry {

@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use georag_core::models::dataset::GeometryType;
+use georag_core::models::GeometryType;
 use serde::Serialize;
 
 /// Output for init command

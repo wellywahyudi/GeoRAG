@@ -13,8 +13,7 @@ use georag_core::formats::{
     docx::DocxReader, geojson::GeoJsonReader, gpx::GpxReader, kml::KmlReader, pdf::PdfReader,
     shapefile::ShapefileFormatReader, FormatFeature, FormatRegistry,
 };
-use georag_core::models::dataset::GeometryType;
-use georag_core::models::{Dataset, DatasetId};
+use georag_core::models::{Dataset, DatasetId, GeometryType};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

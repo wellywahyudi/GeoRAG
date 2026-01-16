@@ -345,7 +345,7 @@ mod tests {
             id: DatasetId(0),
             name: name.to_string(),
             path: PathBuf::from(format!("/tmp/{}.geojson", name)),
-            geometry_type: georag_core::models::dataset::GeometryType::Point,
+            geometry_type: georag_core::models::GeometryType::Point,
             feature_count: 0,
             crs: 4326,
             format: georag_core::models::dataset::FormatMetadata {

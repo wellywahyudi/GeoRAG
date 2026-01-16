@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use super::geometry::GeometryType;
+
 /// Unique identifier for a dataset
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DatasetId(pub u64);
@@ -54,18 +56,6 @@ pub struct Dataset {
 
     /// When the dataset was added
     pub added_at: DateTime<Utc>,
-}
-
-/// Geometry type
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum GeometryType {
-    Point,
-    LineString,
-    Polygon,
-    MultiPoint,
-    MultiLineString,
-    MultiPolygon,
-    GeometryCollection,
 }
 
 /// Format-specific metadata for datasets

@@ -1,7 +1,8 @@
 //! Test format metadata serialization and deserialization
 
 use chrono::Utc;
-use georag_core::models::dataset::{Dataset, DatasetId, FormatMetadata, GeometryType};
+use georag_core::models::dataset::{Dataset, DatasetId, FormatMetadata};
+use georag_core::models::GeometryType;
 use std::path::PathBuf;
 
 #[test]

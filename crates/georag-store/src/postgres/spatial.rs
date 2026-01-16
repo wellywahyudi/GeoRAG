@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use georag_core::error::{GeoragError, Result};
-use georag_core::models::dataset::GeometryType;
 use georag_core::models::{
-    Dataset, DatasetId, DatasetMeta, Feature, FeatureId, Geometry, SpatialFilter, SpatialPredicate,
+    Dataset, DatasetId, DatasetMeta, Feature, FeatureId, Geometry, GeometryType, SpatialFilter,
+    SpatialPredicate,
 };
 use sqlx::Row;
 use uuid::Uuid;
@@ -52,7 +52,7 @@ impl SpatialStore for PostgresStore {
             GeometryType::MultiPoint => "MultiPoint",
             GeometryType::MultiLineString => "MultiLineString",
             GeometryType::MultiPolygon => "MultiPolygon",
-            GeometryType::GeometryCollection => "GeometryCollection",
+            GeometryType::GeometryCollection | GeometryType::Mixed => "GeometryCollection",
         };
 
         // Insert dataset
