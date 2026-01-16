@@ -275,9 +275,9 @@ fn load_config(path: &Path) -> Result<Config> {
 
 Update relevant documentation in `docs/`:
 
-- `docs/quick-start.md` - Getting started guide
-- `docs/cli-reference.md` - CLI commands
-- `docs/output-formatting.md` - Output formats
+- `docs/README.md` - Main documentation
+- `docs/CLI.md` - CLI commands
+- `docs/API.md` - REST API reference
 - Add new guides as needed
 
 ### Examples

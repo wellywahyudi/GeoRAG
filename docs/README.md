@@ -1,248 +1,249 @@
 # GeoRAG Documentation
 
-Welcome to the GeoRAG documentation! This guide will help you get started with GeoRAG and make the most of its features.
+**Geospatial Retrieval-Augmented Generation** - Combine spatial data with semantic search.
 
-## Getting Started
+## Table of Contents
 
-New to GeoRAG? Start here:
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Basic Workflow](#basic-workflow)
+- [Core Concepts](#core-concepts)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Reference](#reference)
 
-1. **[Quick Start Guide](quick-start.md)** - Get up and running in 5 minutes
+---
 
-   - Installation
-   - Your first workspace
-   - Basic workflow
-   - Common patterns
+## Quick Start
 
-2. **[CLI Reference](cli-reference.md)** - Complete command documentation
+```bash
+# 1. Install
+cargo install --path crates/georag-cli
 
-   - All commands and options
-   - Environment variables
-   - Exit codes
-   - Tips and tricks
+# 2. Start Ollama
+ollama pull nomic-embed-text
 
-3. **[Output Formatting Guide](output-formatting.md)** - JSON output and dry-run mode
-   - JSON output for automation
-   - Dry-run mode for safety
-   - Combining modes
-   - Best practices
+# 3. Initialize workspace
+georag init my-project
+cd my-project
+
+# 4. Add datasets
+georag add cities.geojson
+
+# 5. Build index
+georag build
+
+# 6. Query
+georag query "What cities are in the dataset?"
+```
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Rust | 1.70+ | Build toolchain |
+| Ollama | Latest | Embedding generation |
+| PostgreSQL | 14+ | Optional persistent storage |
+
+### Build from Source
+
+```bash
+git clone https://github.com/wellywahyudi/georag.git
+cd georag
+
+# Build all crates
+cargo build --release
+
+# Install CLI
+cargo install --path crates/georag-cli
+
+# Verify
+georag --version
+```
+
+### Start Dependencies
+
+```bash
+# Pull embedding model
+ollama pull nomic-embed-text
+
+# Verify Ollama
+ollama list
+
+# Optional: Start PostgreSQL
+docker run -d --name georag-db \
+  -e POSTGRES_DB=georag \
+  -e POSTGRES_PASSWORD=secret \
+  -p 5432:5432 postgres:14
+```
+
+---
+
+## Basic Workflow
+
+### Step 1: Initialize Workspace
+
+```bash
+georag init my-project
+cd my-project
+```
+
+This creates:
+```
+my-project/
+└── .georag/
+    ├── config.toml      # Workspace configuration
+    ├── datasets/        # Stored datasets
+    └── index/           # Built index
+```
+
+### Step 2: Add Datasets
+
+**Supported Formats:**
+
+| Format | Extensions | Description |
+|--------|------------|-------------|
+| GeoJSON | `.geojson` | Standard geospatial JSON |
+| Shapefile | `.shp` | ESRI Shapefile |
+| GPX | `.gpx` | GPS tracks/waypoints |
+| KML | `.kml` | Google Earth format |
+| PDF | `.pdf` | Documents (with geometry) |
+| DOCX | `.docx` | Word documents |
+
+```bash
+# Single file
+georag add cities.geojson
+
+# Batch directory
+georag add data/
+
+# With options
+georag add report.pdf --geometry location.geojson
+```
+
+### Step 3: Build Index
+
+```bash
+georag build
+
+# With specific embedder
+georag build --embedder ollama:mxbai-embed-large
+
+# Force rebuild
+georag build --force
+```
+
+### Step 4: Query
+
+```bash
+# Basic query
+georag query "What features exist?"
+
+# Spatial query
+georag query "What's nearby?" \
+  --spatial dwithin \
+  --geometry point.geojson \
+  --distance 5km
+
+# Text filtering
+georag query "Find restaurants" \
+  --must-contain "seafood" \
+  --exclude "closed"
+```
+
+### Step 5: Check Status
+
+```bash
+georag status
+georag doctor
+```
+
+---
 
 ## Core Concepts
 
 ### Workspace
 
-A GeoRAG workspace is a directory containing:
+A workspace is a directory containing:
 
-- `.georag/` - Configuration and data directory
-- `config.toml` - Workspace configuration
-- `datasets.json` - Registered datasets
-- `datasets/` - Dataset files
-- `index/` - Built retrieval index
+| Path | Purpose |
+|------|---------|
+| `.georag/config.toml` | CRS, units, validation settings |
+| `.georag/datasets/` | Registered dataset files |
+| `.georag/index/` | Built retrieval index |
 
 ### Coordinate Reference Systems (CRS)
 
-GeoRAG is CRS-transparent, meaning:
-
-- Every workspace has a defined CRS
-- Every dataset has a detected CRS
-- CRS mismatches are explicitly warned
-- Geometries are normalized during build
-
-### Index Building
-
-The index building process:
-
-1. Normalizes geometries to workspace CRS
-2. Validates and fixes invalid geometries
-3. Generates embeddings for text chunks
-4. Creates a deterministic index hash
-5. Saves index state for reproducibility
+- Every workspace has a defined CRS (default: EPSG:4326)
+- Datasets are validated for CRS compatibility
+- Use `--force` to override CRS mismatch warnings
 
 ### Retrieval Pipeline
 
-Query execution follows this pipeline:
+```
+Query → Spatial Filter → Text Filter → Semantic Ranking → Results
+         ↓                ↓              ↓
+      BBox/DWithin    Must/Exclude   Embeddings
+```
 
-1. **Spatial Filtering** - Filter by geographic constraints
-2. **Semantic Ranking** - Rank by embedding similarity
-3. **Result Grounding** - Link results to source features
-4. **Explanation** - Provide reasoning (optional)
+### Spatial Predicates
+
+| Predicate | Description |
+|-----------|-------------|
+| `within` | Feature is inside filter geometry |
+| `intersects` | Feature overlaps filter geometry |
+| `contains` | Feature contains filter geometry |
+| `bbox` | Bounding boxes intersect (fast) |
+| `dwithin` | Within geodesic distance |
+
+---
 
 ## Architecture
 
-GeoRAG follows hexagonal architecture:
-
 ```
 ┌─────────────────────────────────────────┐
-│         Adapters (CLI, API)             │
-└─────────────────────────────────────────┘
-                  │
-┌─────────────────────────────────────────┐
-│        Application Layer                │
-│     (Use Cases, Orchestration)          │
-└─────────────────────────────────────────┘
-                  │
-┌─────────────────────────────────────────┐
-│          Domain Core                    │
-│  (georag-core, georag-geo, retrieval)   │
-└─────────────────────────────────────────┘
-                  │
-┌─────────────────────────────────────────┐
-│    Infrastructure Adapters              │
-│   (georag-store, georag-llm)            │
+│           CLI / REST API                │
+│      (georag-cli, georag-api)           │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────┴────────────────────────┐
+│         Retrieval Pipeline              │
+│          (georag-retrieval)             │
+└────────────────┬────────────────────────┘
+                 │
+┌────────┬───────┴───────┬────────────────┐
+│ georag │   georag-geo  │  georag-llm    │
+│ -core  │   (spatial)   │  (embeddings)  │
+└────────┴───────┬───────┴────────────────┘
+                 │
+┌────────────────┴────────────────────────┐
+│            Storage Layer                │
+│   (Memory / PostgreSQL adapters)        │
 └─────────────────────────────────────────┘
 ```
 
 ### Crates
 
-- **georag-core** - Domain models, workspace, configuration
-- **georag-geo** - Geometry operations, CRS, spatial predicates
-- **georag-retrieval** - Search pipelines, ranking
-- **georag-llm** - Embedding generation (Ollama)
-- **georag-store** - Storage abstractions
-- **georag-cli** - Command-line interface
-- **georag-api** - HTTP API (future)
+| Crate | Purpose |
+|-------|---------|
+| `georag-core` | Domain models, configuration, format readers |
+| `georag-geo` | Geometry operations, CRS, spatial predicates |
+| `georag-retrieval` | Search pipeline, ranking |
+| `georag-llm` | Embedding generation (Ollama) |
+| `georag-store` | Storage adapters (Memory, PostgreSQL) |
+| `georag-cli` | Command-line interface |
+| `georag-api` | REST API server |
 
-## Features
-
-### ✅ Implemented
-
-- [x] Workspace initialization and management
-- [x] Dataset registration with validation
-- [x] CRS detection and mismatch warnings
-- [x] Index building with embeddings
-- [x] Spatial-semantic query execution
-- [x] JSON output mode
-- [x] Dry-run mode
-- [x] Configuration inspection
-- [x] Deterministic index builds
-
-### 🚧 In Progress
-
-- [ ] Property-based testing suite
-- [ ] HTTP API server
-- [ ] MCP protocol support
-
-### 📋 Planned
-
-- [ ] Additional storage backends (PostgreSQL/PostGIS)
-- [ ] Additional embedding models
-- [ ] Web UI
-- [ ] Advanced spatial operations
-- [ ] Query optimization
-
-## Use Cases
-
-### 1. Geospatial Data Exploration
-
-Explore and query geospatial datasets with natural language:
-
-```bash
-georag init exploration
-georag add cities.geojson
-georag build
-georag query "What are the largest cities?"
-```
-
-### 2. Location-Based Search
-
-Find information within geographic constraints:
-
-```bash
-georag query "What restaurants are nearby?" \
-  --spatial within \
-  --geometry location.geojson \
-  --distance 1km
-```
-
-### 3. Multi-Dataset Analysis
-
-Query across multiple geospatial datasets:
-
-```bash
-georag add cities.geojson
-georag add roads.geojson
-georag add regions.geojson
-georag build
-georag query "What infrastructure exists in urban areas?"
-```
-
-### 4. CI/CD Integration
-
-Automate geospatial data processing:
-
-```bash
-georag init --json
-georag add data/*.geojson --json
-georag build --json
-georag query "Generate summary" --json
-```
-
-### 5. Data Quality Validation
-
-Validate and fix geospatial data:
-
-```bash
-georag add dataset.geojson
-georag build  # Reports invalid geometries and fixes
-georag inspect datasets  # View metadata
-```
-
-## Best Practices
-
-### 1. Start with Dry-Run
-
-Always preview operations first:
-
-```bash
-georag build --dry-run
-georag add dataset.geojson --dry-run
-```
-
-### 2. Use JSON for Automation
-
-Leverage JSON output in scripts:
-
-```bash
-georag status --json | jq '.data.index.built'
-```
-
-### 3. Check Status Regularly
-
-Monitor workspace state:
-
-```bash
-georag status
-georag inspect datasets
-georag inspect index
-```
-
-### 4. Validate CRS
-
-Ensure CRS consistency:
-
-```bash
-georag inspect crs
-```
-
-### 5. Keep Index Updated
-
-Rebuild after changes:
-
-```bash
-georag add new-dataset.geojson
-georag build --force
-```
+---
 
 ## Configuration
 
-### Layered Configuration
-
-GeoRAG uses layered configuration with clear precedence:
-
-```
-CLI Arguments > Environment Variables > Config File > Defaults
-```
-
-### Configuration File
+### Workspace Config
 
 Located at `.georag/config.toml`:
 
@@ -254,137 +255,47 @@ geometry_validity = "Lenient"
 
 ### Environment Variables
 
-```bash
-export GEORAG_CRS=4326
-export GEORAG_DISTANCE_UNIT=Kilometers
-export GEORAG_EMBEDDER=ollama:nomic-embed-text
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection | (memory) |
+| `GEORAG_CRS` | Default CRS | `4326` |
+| `GEORAG_EMBEDDER` | Embedder model | `ollama:nomic-embed-text` |
 
-### Inspection
+### Global CLI Options
 
-View configuration sources:
-
-```bash
-georag inspect config
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Not in a GeoRAG workspace"**
-
-   - Solution: Run `georag init` or navigate to workspace directory
-
-2. **"Index not built"**
-
-   - Solution: Run `georag build`
-
-3. **"Embedder unavailable"**
-
-   - Solution: Ensure Ollama is running and model is pulled
-
-4. **"CRS mismatch"**
-
-   - Solution: Use `--force` flag or reproject data
-
-5. **"Invalid geometry"**
-   - Solution: GeoRAG will attempt to fix during build
-
-### Getting Help
-
-- 📖 Read the documentation
-- 🐛 [Report issues](https://github.com/wellywahyudi/georag/issues)
-- 💬 [Join discussions](https://github.com/wellywahyudi/georag/discussions)
-- 📧 Contact maintainers
-
-## Examples
-
-See the [examples directory](../examples/) for:
-
-- Basic workflows
-- Advanced queries
-- Scripting examples
-- CI/CD integration
-- Custom configurations
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
-
-- Development setup
-- Code style guidelines
-- Testing requirements
-- Pull request process
-
-## API Reference
-
-### CLI Commands
-
-- `init` - Initialize workspace
-- `add` - Add dataset
-- `build` - Build index
-- `query` - Execute query
-- `inspect` - Inspect state
-- `status` - Show status
-
-See [CLI Reference](cli-reference.md) for complete documentation.
-
-### Rust API
-
-For programmatic access, see the crate documentation:
-
-```bash
-cargo doc --open
-```
-
-## Design Principles
-
-### Correctness First
-
-- Explicit CRS handling
-- Deterministic operations
-- Property-based testing
-- No silent failures
-
-### Local-First
-
-- All processing local
-- No cloud dependencies
-- Optional cloud adapters
-- Full data privacy
-
-### Inspectable
-
-- Every operation explainable
-- Configuration traceable
-- Index reproducible
-- Dry-run for all changes
-
-### Extensible
-
-- Port/adapter pattern
-- Clean separation
-- Easy to extend
-- Pluggable components
-
-## Roadmap
-
-See the [main README](../README.md#roadmap) for the project roadmap.
-
-## License
-
-GeoRAG is licensed under the MIT License. See [LICENSE](../LICENSE) for details.
-
-## Acknowledgments
-
-Built with:
-
-- [Rust](https://www.rust-lang.org/)
-- [geo](https://github.com/georust/geo)
-- [Ollama](https://ollama.ai/)
-- [clap](https://github.com/clap-rs/clap)
+| Option | Description |
+|--------|-------------|
+| `--json` | JSON output for scripting |
+| `--dry-run` | Preview without executing |
+| `--explain` | Detailed operation info |
+| `--storage` | `memory` or `postgres` |
 
 ---
 
-**Questions?** Open an [issue](https://github.com/wellywahyudi/georag/issues) or start a [discussion](https://github.com/wellywahyudi/georag/discussions).
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Not in a workspace" | Run `georag init` first |
+| "Index not built" | Run `georag build` |
+| "Embedder unavailable" | Start Ollama: `ollama serve` |
+| "CRS mismatch" | Use `--force` or reproject data |
+| "Invalid geometry" | Auto-fixed during build (lenient mode) |
+
+### Health Check
+
+```bash
+georag doctor --verbose
+```
+
+---
+
+## Reference
+
+| Document | Description |
+|----------|-------------|
+| **[CLI Reference](CLI.md)** | Complete command documentation |
+| **[REST API](API.md)** | HTTP API endpoints |
+| **[Contributing](CONTRIBUTING.md)** | Development guidelines |
+
+---

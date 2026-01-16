@@ -1,253 +1,118 @@
 <p align="center">
 <img src="docs/assets/GeoRAG.png" alt="GeoRAG - Geospatial Data RAG" width="100%">
-<br>
+</p>
 
 <div align="center">
 
-[📖 Quick Start](docs/quick-start.md) <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-[📚 Documentation](docs/) <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-[🔧 CLI Reference](docs/cli-reference.md) <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-[🤝 Contribute](#contributing)
+[📖 Quick Start](#quick-start) &nbsp;•&nbsp;
+[📚 Documentation](docs/) &nbsp;•&nbsp;
+[🔧 CLI Reference](docs/CLI.md) &nbsp;•&nbsp;
+[🌐 API Reference](docs/API.md)
 
 </div>
 
-<br>
-
 > [!WARNING]
-> GeoRAG is in active development! As we build towards 1.0, future updates **will** contain **breaking changes**. We'll annotate changes and provide migration paths as the project evolves.
+> GeoRAG is in active development. Future updates may contain breaking changes.
 
 ## What is GeoRAG?
 
-GeoRAG is a Rust library for building **location-aware RAG applications** that combine spatial filtering, lexical search, and vector-based semantic retrieval. Built with privacy and correctness in mind, all processing happens locally without cloud dependencies.
+GeoRAG is a Rust library for building **location-aware RAG applications** that combine spatial filtering with semantic search. All processing happens locally without cloud dependencies.
 
 ## Features
 
-- **Spatial-Aware Retrieval** - Combine geographic constraints with semantic search
-- **Multi-Format Support** - Import GeoJSON, Shapefile, GPX, KML, PDF, and DOCX files
-- **Pure Rust** - Zero system dependencies, fast builds, easy deployment
-- **Local-First** - All processing happens on your machine, no cloud dependencies
-- **Deterministic** - Reproducible index builds with hash verification
-- **CRS-Transparent** - Explicit coordinate reference system handling and validation
-- **Interactive CLI** - Guided prompts, progress bars, and helpful error messages
-- **Flexible Storage** - In-memory or PostgreSQL/PostGIS backends
-- **Inspectable** - Every operation can be explained, replayed, and debugged
-- **High Performance** - R\*-tree spatial indexing for fast queries
+| Category | Capabilities |
+|----------|-------------|
+| **Formats** | GeoJSON, Shapefile, GPX, KML, PDF, DOCX |
+| **Spatial** | Within, Intersects, Contains, BBox, DWithin |
+| **Text** | Must-contain, exclude keyword filtering |
+| **Storage** | In-memory, PostgreSQL + PostGIS |
+| **Embeddings** | Ollama (local models) |
+| **API** | CLI + REST API |
 
 ## Quick Start
 
-### Installation
-
 ```bash
-# Clone and build
+# Install
 git clone https://github.com/wellywahyudi/georag.git
-cd georag
-cargo build --release
+cd georag && cargo install --path crates/georag-cli
 
-# Or install CLI
-cargo install --path crates/georag-cli
-```
+# Start Ollama
+ollama pull nomic-embed-text
 
-### Basic Usage
-
-```bash
-# Interactive setup
-georag init --interactive
-
-# Add a dataset
+# Initialize, add data, build, query
+georag init my-project && cd my-project
 georag add cities.geojson
-
-# Build the index
 georag build
-
-# Query with spatial constraints
-georag query "What are the main features?" \
-  --spatial within \
-  --geometry bbox.geojson
+georag query "What cities are nearby?" --spatial dwithin --distance 5km
 ```
-
-See the [Quick Start Guide](docs/quick-start.md) for detailed walkthrough.
 
 ## CLI Commands
 
-### Core Commands
-
 ```bash
-georag init [PATH]              # Initialize workspace
-georag add <FILE>               # Add dataset
-georag build                    # Build retrieval index
-georag query <TEXT>             # Query with spatial-semantic search
-georag status                   # Show workspace status
+georag init [PATH]     # Initialize workspace
+georag add <FILE>      # Add dataset (file or directory)
+georag build           # Build retrieval index
+georag query <TEXT>    # Spatial-semantic search
+georag status          # Show workspace status
+georag doctor          # Run diagnostics
 ```
 
-### Database Operations (PostgreSQL)
-
+**PostgreSQL:**
 ```bash
-georag migrate --database-url <URL>  # Migrate to PostgreSQL
-georag db rebuild                    # Rebuild database indexes
-georag db stats                      # Show database statistics
-georag db vacuum                     # Run maintenance
+georag migrate --database-url <URL>   # Migrate to PostgreSQL
+georag db rebuild                     # Rebuild indexes
+georag db vacuum                      # Maintenance
 ```
 
-### Utilities
+**Options:** `--json` (scripting), `--dry-run` (preview), `--explain` (details)
+
+## REST API
 
 ```bash
-georag doctor                   # Run health checks
-georag status --datasets        # Show datasets only
-georag status --config          # Show configuration
+# Start server
+DATABASE_URL=postgresql://localhost/georag georag-api
 ```
 
-### Interactive Mode
-
-Add `--interactive` to any command for guided prompts:
-
-```bash
-georag init --interactive
-georag add --interactive
-georag query --interactive
-```
-
-See [CLI Reference](docs/cli-reference.md) for complete documentation.
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check |
+| `POST /api/v1/query` | Execute query |
+| `GET /api/v1/datasets` | List datasets |
+| `POST /api/v1/ingest` | Upload dataset |
+| `GET /api/v1/index/integrity` | Index state |
 
 ## Configuration
 
-GeoRAG uses layered configuration with clear precedence:
-
+```bash
+# Environment
+export DATABASE_URL="postgresql://user:pass@localhost/georag"
+export GEORAG_EMBEDDER="ollama:nomic-embed-text"
 ```
-CLI Arguments > Environment Variables > Config File > Defaults
-```
-
-### Configuration File (`.georag/config.toml`)
 
 ```toml
-[storage]
-backend = "postgres"  # or "memory"
-
-[postgres]
-host = "localhost"
-port = 5432
-database = "georag"
-user = "postgres"
-
-[embedder]
-default = "ollama:nomic-embed-text"
+# .georag/config.toml
+crs = 4326
+distance_unit = "Meters"
 ```
-
-### Environment Variables
-
-```bash
-export DATABASE_URL="postgresql://user:pass@localhost/georag"
-export GEORAG_CRS=4326
-export GEORAG_EMBEDDER=ollama:nomic-embed-text
-```
-
-## Examples
-
-### Basic Workflow
-
-```bash
-# Initialize workspace
-georag init my-project --crs 4326
-
-# Add datasets
-cd my-project
-georag add data/cities.geojson
-georag add data/regions.geojson
-
-# Build index
-georag build
-
-# Query
-georag query "What cities are in the region?" \
-  --spatial within \
-  --geometry region-boundary.geojson
-```
-
-## Crates
-
-The GeoRAG workspace is organized into focused crates:
-
-- **[georag-core](crates/georag-core)** - Domain models, workspace management, configuration
-- **[georag-geo](crates/georag-geo)** - Geometry operations, CRS handling, spatial predicates
-- **[georag-retrieval](crates/georag-retrieval)** - Search pipelines, ranking, query execution
-- **[georag-llm](crates/georag-llm)** - Embedding generation with local models (Ollama)
-- **[georag-store](crates/georag-store)** - Storage abstractions (memory, PostgreSQL)
-- **[georag-cli](crates/georag-cli)** - Command-line interface
-- **[georag-api](crates/georag-api)** - HTTP API (coming soon)
 
 ## Development
 
-### Prerequisites
-
-- Rust 1.70 or later
-- Cargo
-- Ollama (for embedding generation)
-- PostgreSQL with PostGIS (optional, for persistent storage)
-
-### Development
-
-### Code Formatting
-
-This project uses `rustfmt` for consistent code formatting:
-
 ```bash
-# Format all code
-make fmt
-
-# Check formatting
-make fmt-check
-
-# Run all checks (format, lint, test)
-make check
+cargo build --release
+cargo test --all
+cargo clippy --all-targets -- -D warnings
 ```
-
-See [docs/FORMATTING.md](docs/FORMATTING.md) for detailed formatting guidelines.
 
 ## Contributing
 
-We welcome contributions! Here's how you can help:
+1. Fork → 2. Branch → 3. Code → 4. Test → 5. PR
 
-- 🐛 **Report bugs** - [Open an issue](https://github.com/wellywahyudi/georag/issues/new)
-- 💡 **Suggest features** - [Start a discussion](https://github.com/wellywahyudi/georag/discussions)
-- 📝 **Improve docs** - Submit documentation improvements
-- 🔧 **Submit PRs** - Fix bugs or implement features
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes and add tests
-4. Run `cargo test`, `cargo clippy`, `cargo fmt`
-5. Commit your changes
-6. Push to the branch
-7. Open a Pull Request
-
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
-
-## Documentation
-
-- [Quick Start Guide](docs/quick-start.md) - Get up and running in 5 minutes
-- [CLI Reference](docs/cli-reference.md) - Complete command reference
-- [Output Formatting](docs/output-formatting.md) - JSON output and dry-run mode
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT - See [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-GeoRAG is built with excellent open-source tools:
-
-- [Rust](https://www.rust-lang.org/) - Systems programming language
-- [GeoRust](https://georust.org/) - Pure Rust geospatial ecosystem
-  - [geo](https://github.com/georust/geo) - Geospatial primitives and algorithms
-  - [shapefile](https://github.com/tmontaigu/shapefile-rs) - Shapefile reading
-  - [rstar](https://github.com/georust/rstar) - R\*-tree spatial indexing
-  - [proj](https://github.com/georust/proj) - Coordinate transformations
-  - [gpx](https://github.com/georust/gpx) - GPS track parsing
-  - [kml](https://github.com/georust/kml) - KML/Google Earth format support
-- [pdf-extract](https://github.com/jrmuizel/pdf-extract) - PDF text extraction
-- [docx-rs](https://github.com/bokuweb/docx-rs) - DOCX document parsing
-- [Ollama](https://ollama.ai/) - Local LLM and embedding models
-- [clap](https://github.com/clap-rs/clap) - Command-line argument parsing
-- [tokio](https://tokio.rs/) - Asynchronous runtime
-- [PostgreSQL](https://www.postgresql.org/) & [PostGIS](https://postgis.net/) - Spatial database
+Built with [Rust](https://www.rust-lang.org/), [GeoRust](https://georust.org/), [Ollama](https://ollama.ai/), [PostgreSQL](https://www.postgresql.org/) + [PostGIS](https://postgis.net/)
