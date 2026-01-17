@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test build clean check all
+.PHONY: help fmt fmt-check lint test build clean check all api
 
 help:
 	@echo "Available commands:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make check      - Run fmt-check, lint, and test"
 	@echo "  make clean      - Clean build artifacts"
 	@echo "  make all        - Format, lint, test, and build"
+	@echo "  make api        - Run the API server (dev mode)"
 
 fmt:
 	@echo "Formatting Rust code..."
@@ -57,3 +58,12 @@ doc:
 doc-private:
 	@echo "Building documentation (including private items)..."
 	@cargo doc --all --no-deps --document-private-items --open
+
+# API server
+api:
+	@echo "Starting GeoRAG API server..."
+	@cargo run -p georag-api
+
+api-release:
+	@echo "Building and running API server (release)..."
+	@cargo run -p georag-api --release
