@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use axum::http::{header, HeaderValue, Method};
-use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore};
-use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
+use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore, MemoryWorkspaceStore};
+use georag_store::ports::{DocumentStore, SpatialStore, VectorStore, WorkspaceStore};
 use georag_store::postgres::{PostgresConfig, PostgresStore};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -22,18 +22,19 @@ async fn main() {
         "Starting GeoRAG API server"
     );
 
-    let (spatial_store, vector_store, document_store) = init_storage(&config).await;
+    let (spatial_store, vector_store, document_store, workspace_store) = init_storage(&config).await;
 
     let state = Arc::new(AppState::new(
         spatial_store,
         vector_store,
         document_store,
+        workspace_store,
         config.embedder.clone(),
     ));
 
     let cors = CorsLayer::new()
         .allow_origin(config.cors_origin.parse::<HeaderValue>().unwrap())
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 
     let app = create_router(state).layer(cors);
@@ -59,14 +60,19 @@ fn init_tracing() {
 
 async fn init_storage(
     config: &ApiConfig,
-) -> (Arc<dyn SpatialStore>, Arc<dyn VectorStore>, Arc<dyn DocumentStore>) {
+) -> (
+    Arc<dyn SpatialStore>,
+    Arc<dyn VectorStore>,
+    Arc<dyn DocumentStore>,
+    Arc<dyn WorkspaceStore>,
+) {
     match &config.database_url {
         Some(database_url) => {
             tracing::info!("DATABASE_URL found, connecting to PostgreSQL...");
             match init_postgres_storage(database_url).await {
                 Ok(store) => {
                     tracing::info!("Connected to PostgreSQL");
-                    (store.clone(), store.clone(), store)
+                    (store.clone(), store.clone(), store.clone(), store)
                 }
                 Err(e) => {
                     tracing::error!("Failed to connect to PostgreSQL: {}", e);
@@ -86,6 +92,7 @@ async fn init_storage(
                 Arc::new(MemorySpatialStore::new()),
                 Arc::new(MemoryVectorStore::new()),
                 Arc::new(MemoryDocumentStore::new()),
+                Arc::new(MemoryWorkspaceStore::new()),
             )
         }
     }
@@ -100,3 +107,4 @@ async fn init_postgres_storage(database_url: &str) -> Result<Arc<PostgresStore>,
         .map(Arc::new)
         .map_err(|e| format!("Connection failed: {}", e))
 }
+

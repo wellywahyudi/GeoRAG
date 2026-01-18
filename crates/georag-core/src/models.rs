@@ -11,4 +11,4 @@ pub use geometry::{
     ValidityMode,
 };
 pub use query::{Feature, FeatureId, ScoredResult};
-pub use workspace::{IndexState, Workspace, WorkspaceConfig};
+pub use workspace::{IndexState, Workspace, WorkspaceConfig, WorkspaceId, WorkspaceMeta};

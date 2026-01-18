@@ -5,6 +5,7 @@ pub mod migrations;
 pub mod spatial;
 pub mod transaction;
 pub mod vector;
+pub mod workspace;
 
 pub use config::{IndexConfig, MigrationConfig, PoolConfig, PostgresConfig};
 pub use index::{IndexStats, RebuildResult, VacuumResult};

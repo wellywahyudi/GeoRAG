@@ -2,8 +2,30 @@ use async_trait::async_trait;
 use georag_core::error::Result;
 use georag_core::models::{
     ChunkId, Dataset, DatasetId, DatasetMeta, Embedding, Feature, FeatureId, ScoredResult,
-    SpatialFilter, TextChunk,
+    SpatialFilter, TextChunk, WorkspaceConfig, WorkspaceId, WorkspaceMeta,
 };
+
+/// Port for workspace management operations
+#[async_trait]
+pub trait WorkspaceStore: Send + Sync {
+    /// Create a new workspace
+    async fn create_workspace(&self, name: &str, config: &WorkspaceConfig) -> Result<WorkspaceId>;
+
+    /// Get workspace by ID
+    async fn get_workspace(&self, id: WorkspaceId) -> Result<Option<WorkspaceMeta>>;
+
+    /// List all workspaces
+    async fn list_workspaces(&self) -> Result<Vec<WorkspaceMeta>>;
+
+    /// Delete a workspace and all its data
+    async fn delete_workspace(&self, id: WorkspaceId) -> Result<()>;
+
+    /// List datasets for a specific workspace
+    async fn list_datasets_for_workspace(&self, workspace_id: WorkspaceId) -> Result<Vec<DatasetMeta>>;
+
+    /// Delete a dataset within a workspace
+    async fn delete_dataset_in_workspace(&self, workspace_id: WorkspaceId, dataset_id: DatasetId) -> Result<()>;
+}
 
 /// Port for spatial data storage operations
 #[async_trait]

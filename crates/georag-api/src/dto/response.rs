@@ -10,6 +10,18 @@ pub struct DatasetInfo {
     pub count: usize,
 }
 
+/// Extended dataset information for workspace-scoped responses
+#[derive(Debug, Serialize)]
+pub struct DatasetResponse {
+    pub id: u64,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub geometry_type: String,
+    pub feature_count: usize,
+    pub crs: u32,
+    pub added_at: DateTime<Utc>,
+}
+
 /// Ingest operation response
 #[derive(Debug, Serialize)]
 pub struct IngestResponse {
@@ -59,3 +71,62 @@ impl Default for HealthResponse {
         Self { status: "ok", service: "georag-api" }
     }
 }
+
+/// Workspace response
+#[derive(Debug, Serialize)]
+pub struct WorkspaceResponse {
+    pub id: String,
+    pub name: String,
+    pub crs: u32,
+    pub distance_unit: String,
+    pub geometry_validity: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Index status response for workspace-scoped index operations
+#[derive(Debug, Serialize)]
+pub struct IndexStatusResponse {
+    pub built: bool,
+    pub rebuilding: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub built_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunk_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedder: Option<String>,
+}
+
+/// Rebuild operation response (202 Accepted)
+#[derive(Debug, Serialize)]
+pub struct RebuildResponse {
+    pub status: String,
+    pub message: String,
+}
+
+impl RebuildResponse {
+    pub fn accepted() -> Self {
+        Self {
+            status: "accepted".to_string(),
+            message: "Index rebuild started. Poll GET /index/status for progress.".to_string(),
+        }
+    }
+}
+
+/// Delete operation response
+#[derive(Debug, Serialize)]
+pub struct DeleteResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+impl DeleteResponse {
+    pub fn success(entity: &str, id: &str) -> Self {
+        Self {
+            success: true,
+            message: format!("Successfully deleted {} {}", entity, id),
+        }
+    }
+}
+

@@ -5,15 +5,16 @@
 //! an unrecoverable state. For production workloads, use the PostgreSQL backend.
 
 use async_trait::async_trait;
+use chrono::Utc;
 use georag_core::error::Result;
 use georag_core::models::{
     ChunkId, Dataset, DatasetId, DatasetMeta, Embedding, Feature, FeatureId, ScoredResult,
-    SpatialFilter, TextChunk,
+    SpatialFilter, TextChunk, WorkspaceConfig, WorkspaceId, WorkspaceMeta,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::ports::{DocumentStore, SpatialStore, Transaction, Transactional, VectorStore};
+use crate::ports::{DocumentStore, SpatialStore, Transaction, Transactional, VectorStore, WorkspaceStore};
 
 /// In-memory implementation of SpatialStore
 #[derive(Debug, Clone, Default)]
@@ -331,6 +332,95 @@ impl DocumentStore for MemoryDocumentStore {
     async fn list_chunk_ids(&self) -> Result<Vec<ChunkId>> {
         let chunks = self.chunks.read().unwrap();
         Ok(chunks.keys().copied().collect())
+    }
+}
+
+/// Stored workspace data
+#[derive(Debug, Clone)]
+struct StoredWorkspace {
+    meta: WorkspaceMeta,
+    #[allow(dead_code)]
+    config: WorkspaceConfig,
+    #[allow(dead_code)]
+    datasets: Vec<DatasetId>,
+}
+
+/// In-memory implementation of WorkspaceStore
+#[derive(Debug, Clone, Default)]
+pub struct MemoryWorkspaceStore {
+    workspaces: Arc<RwLock<HashMap<WorkspaceId, StoredWorkspace>>>,
+    workspace_datasets: Arc<RwLock<HashMap<WorkspaceId, HashMap<DatasetId, DatasetMeta>>>>,
+}
+
+impl MemoryWorkspaceStore {
+    /// Create a new in-memory workspace store
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a dataset with a workspace
+    pub fn register_dataset(&self, workspace_id: WorkspaceId, dataset: DatasetMeta) {
+        let mut ws_datasets = self.workspace_datasets.write().unwrap();
+        ws_datasets.entry(workspace_id).or_default().insert(dataset.id, dataset);
+    }
+}
+
+#[async_trait]
+impl WorkspaceStore for MemoryWorkspaceStore {
+    async fn create_workspace(&self, name: &str, config: &WorkspaceConfig) -> Result<WorkspaceId> {
+        let mut workspaces = self.workspaces.write().unwrap();
+
+        let id = WorkspaceId::new();
+        let stored = StoredWorkspace {
+            meta: WorkspaceMeta {
+                id,
+                name: name.to_string(),
+                crs: config.crs,
+                distance_unit: config.distance_unit,
+                geometry_validity: config.geometry_validity,
+                created_at: Utc::now(),
+            },
+            config: config.clone(),
+            datasets: Vec::new(),
+        };
+
+        workspaces.insert(id, stored);
+        Ok(id)
+    }
+
+    async fn get_workspace(&self, id: WorkspaceId) -> Result<Option<WorkspaceMeta>> {
+        let workspaces = self.workspaces.read().unwrap();
+        Ok(workspaces.get(&id).map(|w| w.meta.clone()))
+    }
+
+    async fn list_workspaces(&self) -> Result<Vec<WorkspaceMeta>> {
+        let workspaces = self.workspaces.read().unwrap();
+        Ok(workspaces.values().map(|w| w.meta.clone()).collect())
+    }
+
+    async fn delete_workspace(&self, id: WorkspaceId) -> Result<()> {
+        let mut workspaces = self.workspaces.write().unwrap();
+        let mut ws_datasets = self.workspace_datasets.write().unwrap();
+
+        workspaces.remove(&id);
+        ws_datasets.remove(&id);
+        Ok(())
+    }
+
+    async fn list_datasets_for_workspace(&self, workspace_id: WorkspaceId) -> Result<Vec<DatasetMeta>> {
+        let ws_datasets = self.workspace_datasets.read().unwrap();
+        Ok(ws_datasets
+            .get(&workspace_id)
+            .map(|datasets| datasets.values().cloned().collect())
+            .unwrap_or_default())
+    }
+
+    async fn delete_dataset_in_workspace(&self, workspace_id: WorkspaceId, dataset_id: DatasetId) -> Result<()> {
+        let mut ws_datasets = self.workspace_datasets.write().unwrap();
+        if let Some(datasets) = ws_datasets.get_mut(&workspace_id) {
+            datasets.remove(&dataset_id);
+        }
+        Ok(())
     }
 }
 
