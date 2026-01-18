@@ -21,10 +21,17 @@ pub trait WorkspaceStore: Send + Sync {
     async fn delete_workspace(&self, id: WorkspaceId) -> Result<()>;
 
     /// List datasets for a specific workspace
-    async fn list_datasets_for_workspace(&self, workspace_id: WorkspaceId) -> Result<Vec<DatasetMeta>>;
+    async fn list_datasets_for_workspace(
+        &self,
+        workspace_id: WorkspaceId,
+    ) -> Result<Vec<DatasetMeta>>;
 
     /// Delete a dataset within a workspace
-    async fn delete_dataset_in_workspace(&self, workspace_id: WorkspaceId, dataset_id: DatasetId) -> Result<()>;
+    async fn delete_dataset_in_workspace(
+        &self,
+        workspace_id: WorkspaceId,
+        dataset_id: DatasetId,
+    ) -> Result<()>;
 }
 
 /// Port for spatial data storage operations

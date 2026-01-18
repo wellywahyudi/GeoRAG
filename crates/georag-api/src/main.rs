@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use axum::http::{header, HeaderValue, Method};
-use georag_store::memory::{MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore, MemoryWorkspaceStore};
+use georag_store::memory::{
+    MemoryDocumentStore, MemorySpatialStore, MemoryVectorStore, MemoryWorkspaceStore,
+};
 use georag_store::ports::{DocumentStore, SpatialStore, VectorStore, WorkspaceStore};
 use georag_store::postgres::{PostgresConfig, PostgresStore};
 use tower_http::cors::CorsLayer;
@@ -22,7 +24,8 @@ async fn main() {
         "Starting GeoRAG API server"
     );
 
-    let (spatial_store, vector_store, document_store, workspace_store) = init_storage(&config).await;
+    let (spatial_store, vector_store, document_store, workspace_store) =
+        init_storage(&config).await;
 
     let state = Arc::new(AppState::new(
         spatial_store,
@@ -107,4 +110,3 @@ async fn init_postgres_storage(database_url: &str) -> Result<Arc<PostgresStore>,
         .map(Arc::new)
         .map_err(|e| format!("Connection failed: {}", e))
 }
-

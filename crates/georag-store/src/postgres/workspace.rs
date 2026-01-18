@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use georag_core::error::{GeoragError, Result};
-use georag_core::models::{DatasetId, DatasetMeta, GeometryType, WorkspaceConfig, WorkspaceId, WorkspaceMeta};
 use georag_core::models::workspace::{DistanceUnit, ValidityMode};
+use georag_core::models::{
+    DatasetId, DatasetMeta, GeometryType, WorkspaceConfig, WorkspaceId, WorkspaceMeta,
+};
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -142,12 +144,17 @@ impl WorkspaceStore for PostgresStore {
             .bind(id.0)
             .execute(&self.pool)
             .await
-            .map_err(|e| GeoragError::Serialization(format!("Failed to delete workspace: {}", e)))?;
+            .map_err(|e| {
+                GeoragError::Serialization(format!("Failed to delete workspace: {}", e))
+            })?;
 
         Ok(())
     }
 
-    async fn list_datasets_for_workspace(&self, workspace_id: WorkspaceId) -> Result<Vec<DatasetMeta>> {
+    async fn list_datasets_for_workspace(
+        &self,
+        workspace_id: WorkspaceId,
+    ) -> Result<Vec<DatasetMeta>> {
         let rows = sqlx::query(
             r#"
             SELECT id, name, crs, geometry_type, feature_count, created_at

@@ -45,16 +45,13 @@ pub async fn list_datasets_for_workspace(
         return Err(ApiError::not_found("Workspace not found"));
     }
 
-    let datasets = state
-        .workspace_store
-        .list_datasets_for_workspace(id)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to list datasets for workspace");
-            ApiError::internal("Failed to list datasets").with_details(e.to_string())
-        })?;
+    let datasets = state.workspace_store.list_datasets_for_workspace(id).await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to list datasets for workspace");
+        ApiError::internal("Failed to list datasets").with_details(e.to_string())
+    })?;
 
-    let responses: Vec<DatasetResponse> = datasets.into_iter().map(dataset_meta_to_response).collect();
+    let responses: Vec<DatasetResponse> =
+        datasets.into_iter().map(dataset_meta_to_response).collect();
     Ok(Json(responses))
 }
 
@@ -112,4 +109,3 @@ fn dataset_meta_to_response(meta: DatasetMeta) -> DatasetResponse {
         added_at: meta.added_at,
     }
 }
-

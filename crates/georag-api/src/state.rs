@@ -137,7 +137,10 @@ impl AppState {
     }
 
     /// Rebuild index for a workspace (placeholder for actual rebuild logic)
-    pub async fn rebuild_index_for_workspace(&self, workspace_id: WorkspaceId) -> Result<(), GeoragError> {
+    pub async fn rebuild_index_for_workspace(
+        &self,
+        workspace_id: WorkspaceId,
+    ) -> Result<(), GeoragError> {
         // Get datasets for workspace
         let datasets = self.workspace_store.list_datasets_for_workspace(workspace_id).await?;
 
@@ -178,4 +181,3 @@ impl AppState {
         Ok(())
     }
 }
-

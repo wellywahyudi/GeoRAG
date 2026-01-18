@@ -36,4 +36,3 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
         .with_state(state)
 }
-

@@ -14,7 +14,9 @@ use georag_core::models::{
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::ports::{DocumentStore, SpatialStore, Transaction, Transactional, VectorStore, WorkspaceStore};
+use crate::ports::{
+    DocumentStore, SpatialStore, Transaction, Transactional, VectorStore, WorkspaceStore,
+};
 
 /// In-memory implementation of SpatialStore
 #[derive(Debug, Clone, Default)]
@@ -407,7 +409,10 @@ impl WorkspaceStore for MemoryWorkspaceStore {
         Ok(())
     }
 
-    async fn list_datasets_for_workspace(&self, workspace_id: WorkspaceId) -> Result<Vec<DatasetMeta>> {
+    async fn list_datasets_for_workspace(
+        &self,
+        workspace_id: WorkspaceId,
+    ) -> Result<Vec<DatasetMeta>> {
         let ws_datasets = self.workspace_datasets.read().unwrap();
         Ok(ws_datasets
             .get(&workspace_id)
@@ -415,7 +420,11 @@ impl WorkspaceStore for MemoryWorkspaceStore {
             .unwrap_or_default())
     }
 
-    async fn delete_dataset_in_workspace(&self, workspace_id: WorkspaceId, dataset_id: DatasetId) -> Result<()> {
+    async fn delete_dataset_in_workspace(
+        &self,
+        workspace_id: WorkspaceId,
+        dataset_id: DatasetId,
+    ) -> Result<()> {
         let mut ws_datasets = self.workspace_datasets.write().unwrap();
         if let Some(datasets) = ws_datasets.get_mut(&workspace_id) {
             datasets.remove(&dataset_id);
