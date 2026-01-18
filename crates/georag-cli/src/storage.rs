@@ -104,6 +104,7 @@ impl Storage {
     }
 
     /// Clear all data (for --force rebuild)
+    #[allow(dead_code)]
     pub async fn clear(&self) -> Result<()> {
         // Clear all chunks
         let chunk_ids = self.document.list_chunk_ids().await?;
