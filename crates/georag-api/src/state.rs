@@ -136,11 +136,15 @@ impl AppState {
         guard.insert(workspace_id, state);
     }
 
-    /// Rebuild index for a workspace (placeholder for actual rebuild logic)
+    /// Rebuild index for a workspace using the shared IndexBuilder
     pub async fn rebuild_index_for_workspace(
         &self,
         workspace_id: WorkspaceId,
     ) -> Result<(), GeoragError> {
+        use georag_geo::models::Crs;
+        use georag_llm::ollama::OllamaEmbedder;
+        use georag_retrieval::IndexBuilder;
+
         // Get datasets for workspace
         let datasets = self.workspace_store.list_datasets_for_workspace(workspace_id).await?;
 
@@ -150,32 +154,57 @@ impl AppState {
             ));
         }
 
-        // TODO: Implement full rebuild logic similar to CLI build command
-        // For now, this is a placeholder that would:
-        // 1. Clear existing chunks and embeddings for workspace
-        // 2. Generate chunks from all datasets
-        // 3. Generate embeddings using the configured embedder
-        // 4. Store chunks and embeddings
-        // 5. Update workspace index state
-
         tracing::info!(
             workspace_id = %workspace_id,
             dataset_count = datasets.len(),
-            "Rebuild would process these datasets"
+            "Starting index rebuild"
         );
 
-        // Simulate some work
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Create embedder from config (default Ollama URL)
+        let ollama_url =
+            std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
+        let embedder = OllamaEmbedder::new(
+            ollama_url,
+            &self.embedder_config.model,
+            self.embedder_config.dimensions,
+        );
 
-        // Set a placeholder index state
-        let index_state = IndexState {
-            hash: format!("{:x}", workspace_id.0.as_u128()),
-            built_at: chrono::Utc::now(),
-            embedder: self.embedder_config.model.clone(),
-            chunk_count: 0,
-            embedding_dim: self.embedder_config.dimensions,
-        };
+        // Create workspace CRS (default to WGS84)
+        let workspace_crs = Crs::wgs84();
 
+        // Create IndexBuilder with stores
+        let builder = IndexBuilder::new(
+            self.spatial_store.clone(),
+            self.vector_store.clone(),
+            self.document_store.clone(),
+            embedder,
+            workspace_crs,
+        )
+        .with_batch_size(32);
+
+        // Perform full rebuild with progress logging
+        let result = builder
+            .full_rebuild(&datasets, true, |progress| {
+                tracing::debug!(
+                    phase = ?progress.phase,
+                    current = progress.current,
+                    total = progress.total,
+                    message = %progress.message,
+                    "Index rebuild progress"
+                );
+            })
+            .await?;
+
+        tracing::info!(
+            workspace_id = %workspace_id,
+            chunk_count = result.chunk_count,
+            embedding_dim = result.embedding_dim,
+            hash = %result.index_hash,
+            "Index rebuild completed"
+        );
+
+        // Create and store the index state
+        let index_state = builder.create_index_state(&result);
         self.set_workspace_index_state(workspace_id, index_state).await;
 
         Ok(())

@@ -1149,6 +1149,7 @@ dependencies = [
  "chrono",
  "geojson",
  "georag-core",
+ "georag-geo",
  "georag-llm",
  "georag-retrieval",
  "georag-store",
