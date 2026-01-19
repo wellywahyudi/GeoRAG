@@ -1,6 +1,6 @@
 use geojson::{Feature, FeatureCollection, Geometry};
-use georag_core::models::{Crs, Geometry as CoreGeometry, SpatialFilter, SpatialPredicate};
 use georag_core::llm::OllamaEmbedder;
+use georag_core::models::{Crs, Geometry as CoreGeometry, SpatialFilter, SpatialPredicate};
 use georag_retrieval::{QueryPlan, QueryResult, RetrievalPipeline, SourceReference};
 use serde_json::{Map, Value as JsonValue};
 

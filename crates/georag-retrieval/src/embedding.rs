@@ -1,6 +1,6 @@
 use georag_core::error::Result;
-use georag_core::models::{Embedding, FeatureId, Geometry, SpatialMetadata, TextChunk};
 use georag_core::llm::Embedder;
+use georag_core::models::{Embedding, FeatureId, Geometry, SpatialMetadata, TextChunk};
 use std::sync::Arc;
 
 /// Port trait for spatial store (re-exported from georag-store)
