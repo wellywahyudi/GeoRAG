@@ -6,7 +6,7 @@ use georag_core::models::{
 use georag_core::processing::chunk::ChunkGenerator;
 use georag_geo::models::{Crs, ValidityMode};
 use georag_geo::validation::validate_geometry;
-use georag_llm::ports::Embedder;
+use georag_core::llm::Embedder;
 use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};

@@ -1,6 +1,6 @@
 use georag_core::error::{GeoragError, Result};
 use georag_core::models::{ChunkId, ScoredResult, TextChunk};
-use georag_llm::ports::Embedder;
+use georag_core::llm::Embedder;
 use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -3,7 +3,6 @@ members = [
     "crates/georag-core",
     "crates/georag-geo",
     "crates/georag-retrieval",
-    "crates/georag-llm",
     "crates/georag-store",
     "crates/georag-api",
     "crates/georag-cli",

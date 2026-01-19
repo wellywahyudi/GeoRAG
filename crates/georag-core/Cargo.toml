@@ -23,6 +23,8 @@ docx-rs.workspace = true
 tracing.workspace = true
 quick-xml.workspace = true
 uuid.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

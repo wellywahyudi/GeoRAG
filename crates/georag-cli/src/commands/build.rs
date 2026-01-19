@@ -7,7 +7,7 @@ use crate::storage::Storage;
 use anyhow::{bail, Result};
 use georag_core::config::CliConfigOverrides;
 use georag_geo::models::Crs;
-use georag_llm::ollama::OllamaEmbedder;
+use georag_core::llm::OllamaEmbedder;
 use georag_retrieval::{IndexBuilder, IndexPhase, IndexProgress};
 use std::fs;
 

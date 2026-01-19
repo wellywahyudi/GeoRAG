@@ -10,7 +10,6 @@ repository.workspace = true
 georag-core = { path = "../georag-core" }
 georag-geo = { path = "../georag-geo" }
 georag-store = { path = "../georag-store" }
-georag-llm = { path = "../georag-llm" }
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true

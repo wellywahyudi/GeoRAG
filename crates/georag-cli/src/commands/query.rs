@@ -6,7 +6,7 @@ use anyhow::{bail, Context, Result};
 use georag_core::models::workspace::IndexState;
 use georag_core::models::WorkspaceConfig;
 use georag_geo::models::{Distance, DistanceUnit};
-use georag_llm::ollama::OllamaEmbedder;
+use georag_core::llm::OllamaEmbedder;
 use georag_retrieval::models::QueryPlan;
 use georag_retrieval::pipeline::RetrievalPipeline;
 use std::fs;

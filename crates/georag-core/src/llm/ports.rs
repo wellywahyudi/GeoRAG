@@ -1,4 +1,4 @@
-use georag_core::error::Result;
+use crate::error::Result;
 
 /// Port for embedding text into vector representations
 pub trait Embedder: Send + Sync {

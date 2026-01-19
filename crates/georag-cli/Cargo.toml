@@ -15,7 +15,6 @@ georag-core = { path = "../georag-core" }
 georag-geo = { path = "../georag-geo" }
 georag-retrieval = { path = "../georag-retrieval" }
 georag-store = { path = "../georag-store" }
-georag-llm = { path = "../georag-llm" }
 clap.workspace = true
 console.workspace = true
 tabled.workspace = true

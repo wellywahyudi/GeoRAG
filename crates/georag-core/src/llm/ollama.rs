@@ -1,5 +1,5 @@
-use crate::ports::Embedder;
-use georag_core::error::{GeoragError, Result};
+use crate::error::{GeoragError, Result};
+use crate::llm::ports::Embedder;
 use serde::{Deserialize, Serialize};
 
 /// Ollama embedder implementation

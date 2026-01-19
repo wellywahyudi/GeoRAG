@@ -142,7 +142,7 @@ impl AppState {
         workspace_id: WorkspaceId,
     ) -> Result<(), GeoragError> {
         use georag_geo::models::Crs;
-        use georag_llm::ollama::OllamaEmbedder;
+        use georag_core::llm::OllamaEmbedder;
         use georag_retrieval::IndexBuilder;
 
         // Get datasets for workspace

@@ -1,4 +1,4 @@
-use georag_core::models::{ChunkId, Embedding, FeatureId, SpatialMetadata};
+use crate::models::{ChunkId, Embedding, FeatureId, SpatialMetadata};
 
 /// Create an embedding with spatial metadata
 pub fn create_embedding_with_spatial_metadata(
