@@ -4,7 +4,6 @@ pub mod formats;
 pub mod geo;
 pub mod llm;
 pub mod models;
-pub mod ports;
 pub mod processing;
 
 pub use error::{GeoragError, Result};

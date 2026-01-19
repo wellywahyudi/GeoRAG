@@ -2,43 +2,59 @@
 
 This directory contains the core Rust crates that make up the GeoRAG workspace.
 
+## Architecture Overview
+
+```
+georag/
+├── crates/
+│   ├── georag-core    # Domain models, errors, formats, geo, llm traits
+│   ├── georag-store   # Storage adapters (Memory, PostgreSQL) + port traits
+│   ├── georag-retrieval # Search pipeline, query execution
+│   ├── georag-api     # REST API (Axum)
+│   └── georag-cli     # CLI application (Clap)
+```
+
+---
+
 ### georag-core
 
-**Domain models, configuration, and format readers.**
+**Domain models, configuration, format readers, geo operations, and LLM traits.**
 
 | Module | Purpose |
 |--------|---------|
 | `config` | Workspace configuration loading |
 | `error` | Custom error types (`GeoragError`, `Result`) |
 | `formats` | Format readers (GeoJSON, Shapefile, GPX, KML, PDF, DOCX) |
+| `geo` | Geometry operations, CRS transforms, spatial indexing, validation |
+| `llm` | LLM/embedding traits and Ollama implementation |
 | `models` | Core domain types (Dataset, Feature, Geometry, Chunk) |
-| `ports` | Abstract trait definitions |
 | `processing` | Text chunking and processing |
 
 ```rust
 use georag_core::{GeoragError, Result};
 use georag_core::models::{Dataset, Feature, Geometry};
 use georag_core::formats::FormatRegistry;
+use georag_core::geo::models::{Crs, SpatialFilter, SpatialPredicate};
+use georag_core::geo::spatial::evaluate_spatial_filter;
+use georag_core::llm::{Embedder, OllamaEmbedder};
 ```
 
 ---
 
-### georag-geo
+### georag-store
 
-**Geometry operations, CRS handling, and spatial predicates.**
+**Storage adapters for persistence.**
 
 | Module | Purpose |
 |--------|---------|
-| `index` | R*-tree spatial indexing |
-| `models` | Geometry types, CRS, Distance, SpatialFilter |
-| `spatial` | Spatial predicate evaluation (Within, Intersects, DWithin) |
-| `transform` | CRS reprojection using PROJ |
-| `validation` | Geometry validation and repair |
+| `memory` | In-memory storage (MemorySpatialStore, MemoryVectorStore, MemoryDocumentStore) |
+| `ports` | Storage traits (SpatialStore, VectorStore, DocumentStore, WorkspaceStore, Transaction) |
+| `postgres` | PostgreSQL + PostGIS adapter with migrations |
 
 ```rust
-use georag_geo::models::{Geometry, Crs, SpatialFilter, SpatialPredicate};
-use georag_geo::spatial::evaluate_spatial_filter;
-use georag_geo::transform::reproject_geometry;
+use georag_store::memory::MemorySpatialStore;
+use georag_store::postgres::{PostgresStore, PostgresConfig};
+use georag_store::ports::{SpatialStore, VectorStore, DocumentStore};
 ```
 
 ---
@@ -57,43 +73,6 @@ use georag_geo::transform::reproject_geometry;
 ```rust
 use georag_retrieval::{RetrievalPipeline, QueryPlan, QueryResult};
 use georag_retrieval::models::TextFilter;
-```
-
----
-
-### georag-llm
-
-**LLM and embedding integrations.**
-
-| Module | Purpose |
-|--------|---------|
-| `embedding` | Helper functions for creating embeddings |
-| `ollama` | OllamaEmbedder implementation |
-| `ports` | Embedder and Generator traits |
-
-```rust
-use georag_llm::{OllamaEmbedder, Embedder};
-
-let embedder = OllamaEmbedder::localhost("nomic-embed-text", 768);
-let vectors = embedder.embed(&["Hello world"])?;
-```
-
----
-
-### georag-store
-
-**Storage adapters for persistence.**
-
-| Module | Purpose |
-|--------|---------|
-| `memory` | In-memory storage (MemorySpatialStore, MemoryVectorStore, MemoryDocumentStore) |
-| `ports` | Storage traits (SpatialStore, VectorStore, DocumentStore, Transaction) |
-| `postgres` | PostgreSQL + PostGIS adapter with migrations |
-
-```rust
-use georag_store::memory::MemorySpatialStore;
-use georag_store::postgres::{PostgresStore, PostgresConfig};
-use georag_store::ports::{SpatialStore, VectorStore};
 ```
 
 ---
@@ -127,6 +106,8 @@ georag query "search text"
 |--------|---------|
 | `routes` | Axum route handlers |
 | `state` | Application state (stores, embedder config) |
+| `handlers` | Request handlers for workspaces, datasets, queries |
+| `services` | Business logic for ingestion and querying |
 
 ```bash
 # Start server
@@ -139,3 +120,38 @@ curl -X POST http://localhost:3001/api/v1/query \
 ```
 
 ---
+
+## Dependency Graph
+
+```
+                    ┌─────────────────┐
+                    │   georag-core   │
+                    │ (models, geo,   │
+                    │  llm, formats)  │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+       ┌────────────┐ ┌────────────┐ ┌────────────┐
+       │georag-store│ │            │ │            │
+       │  (ports,   │ │            │ │            │
+       │  adapters) │ │            │ │            │
+       └─────┬──────┘ │            │ │            │
+             │        │            │ │            │
+             └────────┼────────────┘ │            │
+                      │              │            │
+                      ▼              │            │
+              ┌────────────────┐     │            │
+              │georag-retrieval│     │            │
+              │   (pipeline)   │     │            │
+              └───────┬────────┘     │            │
+                      │              │            │
+        ┌─────────────┴──────────────┘            │
+        │                                         │
+        ▼                                         ▼
+ ┌────────────┐                            ┌────────────┐
+ │ georag-api │                            │ georag-cli │
+ │   (REST)   │                            │   (CLI)    │
+ └────────────┘                            └────────────┘
+```
