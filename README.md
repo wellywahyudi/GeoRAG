@@ -1,5 +1,18 @@
 <p align="center">
-<img src="docs/assets/GeoRAG.png" alt="GeoRAG - Geospatial Data RAG" width="100%">
+  <img src="docs/assets/GeoRAG.png" alt="GeoRAG - Geospatial Data RAG" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/wellywahyudi/georag/actions">
+    <img src="https://github.com/wellywahyudi/georag/actions/workflows/ci.yml/badge.svg" alt="CI Status">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  </a>
+  <a href="https://github.com/wellywahyudi/georag/issues">
+    <img src="https://img.shields.io/github/issues/wellywahyudi/georag" alt="Issues">
+  </a>
+  <img src="https://img.shields.io/badge/rust-1.75%2B-orange.svg" alt="Rust Version">
 </p>
 
 <div align="center">

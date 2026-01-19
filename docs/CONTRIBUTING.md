@@ -299,13 +299,11 @@ fn main() -> anyhow::Result<()> {
 ```
 georag/
 ├── crates/
-│   ├── georag-core/       # Core domain logic
-│   ├── georag-geo/        # Geometry operations
+│   ├── georag-core/       # Core domain logic, geo ops, llm traits
 │   ├── georag-retrieval/  # Search and ranking
-│   ├── georag-llm/        # Embedding generation
 │   ├── georag-store/      # Storage abstractions
 │   ├── georag-cli/        # Command-line interface
-│   └── georag-api/        # HTTP API (future)
+│   └── georag-api/        # HTTP API
 ├── docs/                  # Documentation
 └── examples/              # Example code
 ```
