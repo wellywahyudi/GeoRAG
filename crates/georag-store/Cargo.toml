@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 georag-core = { path = "../georag-core" }
-georag-geo = { path = "../georag-geo" }
 thiserror.workspace = true
 async-trait.workspace = true
 serde.workspace = true

@@ -1,7 +1,7 @@
 //! CRS transformation and normalization
 
-use crate::models::{Crs, Geometry};
-use georag_core::error::{GeoragError, Result};
+use crate::error::{GeoragError, Result};
+use crate::geo::models::{Crs, Geometry};
 use proj::Proj;
 
 /// Check if two CRS are the same

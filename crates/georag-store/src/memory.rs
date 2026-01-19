@@ -173,7 +173,7 @@ impl SpatialStore for MemorySpatialStore {
                 };
 
                 // Apply spatial filter directly (types are now unified!)
-                georag_geo::spatial::evaluate_spatial_filter(feature_geom, filter)
+                georag_core::geo::spatial::evaluate_spatial_filter(feature_geom, filter)
             })
             .cloned()
             .collect())

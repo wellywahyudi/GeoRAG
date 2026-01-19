@@ -1,5 +1,5 @@
-use crate::models::{to_geo_geometry, Geometry, SpatialFilter};
-use crate::spatial::evaluate_spatial_filter;
+use crate::geo::models::{to_geo_geometry, Geometry, SpatialFilter};
+use crate::geo::spatial::evaluate_spatial_filter;
 use rstar::{RTree, RTreeObject, AABB};
 
 /// Indexed geometry with ID
@@ -236,7 +236,7 @@ impl Default for SpatialIndexBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::SpatialPredicate;
+    use crate::geo::models::SpatialPredicate;
 
     #[test]
     fn test_spatial_index_creation() {

@@ -25,6 +25,9 @@ quick-xml.workspace = true
 uuid.workspace = true
 reqwest.workspace = true
 tokio.workspace = true
+geo.workspace = true
+proj.workspace = true
+rstar.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

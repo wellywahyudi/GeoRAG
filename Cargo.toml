@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/georag-core",
-    "crates/georag-geo",
     "crates/georag-retrieval",
     "crates/georag-store",
     "crates/georag-api",

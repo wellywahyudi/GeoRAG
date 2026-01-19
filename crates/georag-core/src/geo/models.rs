@@ -1,12 +1,12 @@
-//! Geometry models for georag-geo.
+//! Geometry models for geo operations.
 //!
-//! This module re-exports canonical types from `georag-core` and provides
-//! additional geo-specific functionality like conversions to/from the `geo` crate.
+//! This module provides conversions between the canonical Geometry type
+//! and the `geo` crate types, as well as extension traits for geo operations.
 
 use geo::Geometry as GeoGeometry;
 
-// Re-export canonical types from georag-core
-pub use georag_core::models::{
+// Re-export canonical types from models module
+pub use crate::models::{
     Crs, Distance, DistanceUnit, Geometry, GeometryType, SpatialFilter, SpatialPredicate,
     ValidityMode,
 };

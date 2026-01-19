@@ -1,7 +1,7 @@
 //! Geometry validation utilities
 
-use crate::models::{Geometry, ValidityMode};
-use georag_core::error::{GeoragError, Result};
+use crate::error::{GeoragError, Result};
+use crate::geo::models::{Geometry, ValidityMode};
 
 /// Validation result with details
 #[derive(Debug, Clone)]

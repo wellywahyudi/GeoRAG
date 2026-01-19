@@ -1149,7 +1149,6 @@ dependencies = [
  "chrono",
  "geojson",
  "georag-core",
- "georag-geo",
  "georag-retrieval",
  "georag-store",
  "serde",
@@ -1175,7 +1174,6 @@ dependencies = [
  "futures",
  "geojson",
  "georag-core",
- "georag-geo",
  "georag-retrieval",
  "georag-store",
  "indicatif",
@@ -1196,13 +1194,16 @@ dependencies = [
  "async-trait",
  "chrono",
  "docx-rs",
+ "geo",
  "geojson",
  "gpx",
  "kml",
  "pdf-extract",
+ "proj",
  "proptest",
  "quick-xml",
  "reqwest",
+ "rstar 0.12.2",
  "serde",
  "serde_json",
  "serial_test",
@@ -1217,27 +1218,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "georag-geo"
-version = "0.1.0"
-dependencies = [
- "geo",
- "geojson",
- "georag-core",
- "proj",
- "proptest",
- "rstar 0.12.2",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
-]
-
-[[package]]
 name = "georag-retrieval"
 version = "0.1.0"
 dependencies = [
  "chrono",
  "georag-core",
- "georag-geo",
  "georag-store",
  "proptest",
  "serde",
@@ -1252,7 +1237,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "georag-core",
- "georag-geo",
  "proptest",
  "serde",
  "serde_json",

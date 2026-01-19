@@ -1,4 +1,4 @@
-use crate::models::{to_geo_geometry, Geometry, SpatialFilter, SpatialPredicate};
+use crate::geo::models::{to_geo_geometry, Geometry, SpatialFilter, SpatialPredicate};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::centroid::Centroid;
 use geo::algorithm::contains::Contains;
@@ -145,7 +145,7 @@ pub fn count_spatial_matches(geometries: &[Geometry], filter: &SpatialFilter) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Distance;
+    use crate::geo::models::Distance as GeoDistance;
 
     fn square_polygon() -> Geometry {
         Geometry::polygon(vec![vec![
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_dwithin_point_to_point() {
-        use crate::models::DistanceUnit;
+        use crate::geo::models::DistanceUnit;
 
         // Two points, approximately 1.1km apart
         let center_point = Geometry::point(115.2625, -8.5069);
@@ -219,7 +219,7 @@ mod tests {
         // Test: nearby point should be within 2km
         let filter_2km = SpatialFilter::new(SpatialPredicate::DWithin)
             .geometry(center_point.clone())
-            .distance(Distance::new(2000.0, DistanceUnit::Meters));
+            .distance(GeoDistance::new(2000.0, DistanceUnit::Meters));
 
         assert!(
             evaluate_spatial_filter(&nearby_point, &filter_2km),
@@ -229,7 +229,7 @@ mod tests {
         // Test: nearby point should NOT be within 500m
         let filter_500m = SpatialFilter::new(SpatialPredicate::DWithin)
             .geometry(center_point.clone())
-            .distance(Distance::new(500.0, DistanceUnit::Meters));
+            .distance(GeoDistance::new(500.0, DistanceUnit::Meters));
 
         assert!(
             !evaluate_spatial_filter(&nearby_point, &filter_500m),
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_dwithin_with_kilometers() {
-        use crate::models::DistanceUnit;
+        use crate::geo::models::DistanceUnit;
 
         let point1 = Geometry::point(115.2625, -8.5069);
         let point2 = Geometry::point(115.3625, -8.5069); // ~11km away
@@ -253,20 +253,20 @@ mod tests {
         // Test with kilometers unit
         let filter_15km = SpatialFilter::new(SpatialPredicate::DWithin)
             .geometry(point1.clone())
-            .distance(Distance::new(15.0, DistanceUnit::Kilometers));
+            .distance(GeoDistance::new(15.0, DistanceUnit::Kilometers));
 
         assert!(evaluate_spatial_filter(&point2, &filter_15km), "Point should be within 15km");
 
         let filter_5km = SpatialFilter::new(SpatialPredicate::DWithin)
             .geometry(point1)
-            .distance(Distance::new(5.0, DistanceUnit::Kilometers));
+            .distance(GeoDistance::new(5.0, DistanceUnit::Kilometers));
 
         assert!(!evaluate_spatial_filter(&point2, &filter_5km), "Point should NOT be within 5km");
     }
 
     #[test]
     fn test_dwithin_polygon_to_point() {
-        use crate::models::DistanceUnit;
+        use crate::geo::models::DistanceUnit;
 
         // A small parcel polygon
         let parcel = Geometry::polygon(vec![vec![
@@ -284,7 +284,7 @@ mod tests {
 
         let filter = SpatialFilter::new(SpatialPredicate::DWithin)
             .geometry(parcel)
-            .distance(Distance::new(5.0, DistanceUnit::Kilometers));
+            .distance(GeoDistance::new(5.0, DistanceUnit::Kilometers));
 
         assert!(
             evaluate_spatial_filter(&near_point, &filter),
@@ -312,13 +312,13 @@ mod tests {
 
     #[test]
     fn test_dwithin_requires_geometry() {
-        use crate::models::DistanceUnit;
+        use crate::geo::models::DistanceUnit;
 
         // DWithin without geometry should return false
         let point = Geometry::point(0.0, 0.0);
 
         let filter_no_geometry = SpatialFilter::new(SpatialPredicate::DWithin)
-            .distance(Distance::new(1000.0, DistanceUnit::Meters));
+            .distance(GeoDistance::new(1000.0, DistanceUnit::Meters));
 
         assert!(
             !evaluate_spatial_filter(&point, &filter_no_geometry),

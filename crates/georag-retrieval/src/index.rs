@@ -1,12 +1,12 @@
 use chrono::Utc;
 use georag_core::error::Result;
+use georag_core::geo::models::{Crs, ValidityMode};
+use georag_core::geo::validation::validate_geometry;
 use georag_core::llm::Embedder;
 use georag_core::models::{
     DatasetMeta, Embedding, IndexState, SpatialFilter, SpatialMetadata, SpatialPredicate, TextChunk,
 };
 use georag_core::processing::chunk::ChunkGenerator;
-use georag_geo::models::{Crs, ValidityMode};
-use georag_geo::validation::validate_geometry;
 use georag_store::ports::{DocumentStore, SpatialStore, VectorStore};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};

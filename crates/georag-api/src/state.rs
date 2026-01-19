@@ -141,8 +141,8 @@ impl AppState {
         &self,
         workspace_id: WorkspaceId,
     ) -> Result<(), GeoragError> {
+        use georag_core::geo::models::Crs;
         use georag_core::llm::OllamaEmbedder;
-        use georag_geo::models::Crs;
         use georag_retrieval::IndexBuilder;
 
         // Get datasets for workspace
