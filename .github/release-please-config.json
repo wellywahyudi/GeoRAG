@@ -1,6 +1,5 @@
 {
     "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-    "release-type": "rust",
     "packages": {
         ".": {
             "release-type": "rust",
@@ -10,13 +9,5 @@
             "bump-patch-for-minor-pre-major": true
         }
     },
-    "include-component-in-tag": false,
-    "plugins": [
-        {
-            "type": "linked-versions",
-            "groupName": "georag-workspace",
-            "components": ["."]
-        },
-        "cargo-workspace"
-    ]
+    "include-component-in-tag": false
 }

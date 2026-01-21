@@ -216,13 +216,13 @@ Query → Spatial Filter → Text Filter → Semantic Ranking → Results
 │          (georag-retrieval)             │
 └────────────────┬────────────────────────┘
                  │
-┌────────┬───────┴───────┬────────────────┐
-│ georag │   georag-geo  │  georag-llm    │
-│ -core  │   (spatial)   │  (embeddings)  │
-└────────┴───────┬───────┴────────────────┘
+┌────────────────┴────────────────────────┐
+│              georag-core                │
+│   (models, formats, geo, llm traits)    │
+└────────────────┬────────────────────────┘
                  │
 ┌────────────────┴────────────────────────┐
-│            Storage Layer                │
+│            georag-store                 │
 │   (Memory / PostgreSQL adapters)        │
 └─────────────────────────────────────────┘
 ```
@@ -231,11 +231,9 @@ Query → Spatial Filter → Text Filter → Semantic Ranking → Results
 
 | Crate | Purpose |
 |-------|---------|
-| `georag-core` | Domain models, configuration, format readers |
-| `georag-geo` | Geometry operations, CRS, spatial predicates |
-| `georag-retrieval` | Search pipeline, ranking |
-| `georag-llm` | Embedding generation (Ollama) |
+| `georag-core` | Domain models, configuration, format readers, geo operations, LLM traits |
 | `georag-store` | Storage adapters (Memory, PostgreSQL) |
+| `georag-retrieval` | Search pipeline, ranking |
 | `georag-cli` | Command-line interface |
 | `georag-api` | REST API server |
 
